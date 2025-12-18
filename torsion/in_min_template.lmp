@@ -1,0 +1,58 @@
+units metal
+boundary p p p
+dimension 3
+
+atom_style full
+
+variable minx equal PY_MINX
+variable maxx equal PY_MAXX
+
+variable miny equal PY_MINY
+variable maxy equal PY_MAXY
+
+variable minz equal PY_MINZ
+variable maxz equal PY_MAXZ
+
+
+variable step_calc equal PY_STEP_CALC
+variable dump_dt equal PY_DUMP_DT
+
+variable dump_write string PY_DUMP_WRITE
+variable deformation string PY_DEFORMATION
+
+
+
+region box block ${minx} ${maxx} ${miny} ${maxy} ${minz} ${maxz}
+create_box 3 box
+read_data quartz_dupl.data add append
+change_box all x final ${minx} ${maxx} y final ${miny} ${maxy} z final ${minz} ${maxz}
+
+mass 1 28.0855
+mass 2 15.9994
+mass 3 1.0080
+
+set type 1 charge +2.4 
+set type 2 charge -1.2
+set type 3 charge +0.6
+
+pair_style hybrid/overlay buck/coul/long 5 lj/cut 1.2
+pair_coeff 1 1 buck/coul/long 0.0 1.0 0.0
+pair_coeff 1 2 buck/coul/long 18003.7572 0.2052 133.5381
+pair_coeff 1 2 lj/cut 2.0 1.2 1.2
+pair_coeff 2 2 buck/coul/long 1388.7730 0.36232 175.00 
+pair_coeff 2 2 lj/cut 2.6 1.6
+pair_coeff 3 1 buck/coul/long 0.0 1.0 0.0
+pair_coeff 3 2 buck/coul/long 44017.985421 0.117413 12.500000
+pair_coeff 3 3 buck/coul/long 0.0 1.0 0.0
+
+neighbor 2.0 bin
+
+kspace_style pppm 1.0e-4
+#kspace_modify slab nozforce
+
+group 1 id 1 2
+
+
+dump dummp all atom 1 ${dump_write}
+dump_modify dummp sort id
+minimize 1.0e-4 1.0e-5 1000 10000 
