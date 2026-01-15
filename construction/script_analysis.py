@@ -899,18 +899,18 @@ def quicksurf(Pos,N_list=[20,20,80],alpha=1):
 
 
 if __name__=="__main__":
-    # file = "dump_last_oh.lammpstrj"
-    # file = "dummp_trimmed.lammpstrj"
-    # file = "dummps_snad_last.lammpstrj"
-    file = "dummp_700_last.lammpstrj"
-    # file = "dummp_twisted_long.lammpstrj"
-    # file = "quartz_dupl.data"
-    # file = "dummps_snad_last.lammpstrj"
-    # file = "dummps_round_2_last.lammpstrj"
-    # file = "dummps_round_3_last.lammpstrj"
-    # file = "dummps_long_last.lammpstrj"
-    # file = "dummp_trimmed_long_0K.lammpstrj"
-    # file = "dummp_trimmed_0K_last.lammpstrj"
+    # file = "demo/dump_last_oh.lammpstrj"
+    # file = "demo/dummp_trimmed.lammpstrj"
+    # file = "demo/dummps_snad_last.lammpstrj"
+    file = "demo/dummp_700_last.lammpstrj"
+    # file = "demo/dummp_twisted_long.lammpstrj"
+    # file = "demo/quartz_dupl.data"
+    # file = "demo/dummps_snad_last.lammpstrj"
+    # file = "demo/dummps_round_2_last.lammpstrj"
+    # file = "demo/dummps_round_3_last.lammpstrj"
+    # file = "demo/dummps_long_last.lammpstrj"
+    # file = "demo/dummp_trimmed_long_0K.lammpstrj"
+    # file = "demo/dummp_trimmed_0K_last.lammpstrj"
 
     list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
     # list_BOX,list_ATOMS = read_data(file,do_scale=False)
