@@ -8,7 +8,10 @@ SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used t
 
 ## Getting Started
 
-blabla
+Construction : the scripts that are used to create an helix or a twisted ribbon
+Torsion : the scripts are used to twist the cuboids to the proper shape. This method should not be used, but is kept here just in case.
+
+Analysis
 
 ## Depedencies
 

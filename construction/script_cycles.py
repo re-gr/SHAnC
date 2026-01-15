@@ -69,15 +69,15 @@ def count_cycles(Pos,Types,cube=14,threshold_Si=2,periodic=True,Lims=None):
 
                 if (Types_trunc == 1).any() and (Types_trunc==2).any():
 
-                    Bonds = compute_bonds_neighbors(Pos_trunc,Types_trunc,cube=cube,periodic=False,Lims=Lims)
+                    Bonds = compute_bonds_graph(Pos_trunc,Types_trunc,cube=cube,periodic=False,Lims=Lims)
                     ind_trunc = ind_tot[Pos_trunc_ind[Types_added==1]]
 
 
 
                     c=time.time()
                     G = nx.from_numpy_array(Bonds)
-                    # L = nx.minimum_cycle_basis(G)
-                    L = nx.cycle_basis(G)
+                    L = nx.minimum_cycle_basis(G)
+                    # L = nx.cycle_basis(G)
                     # L = nx.simple_cycles(G)
                     d = time.time()
                     for cycle in L:
@@ -193,11 +193,11 @@ def count_cycles_test(Pos,Types,cube=14,threshold_Si=2,periodic=True,Lims=None):
 
                 if (Types_trunc == 1).any() and (Types_trunc==2).any():
 
-                    Bonds = compute_bonds_neighbors(Pos_trunc,Types_trunc,cube=cube,periodic=False,Lims=Lims)
+                    Bonds = compute_bonds_graph(Pos_trunc,Types_trunc,cube=cube,periodic=False,Lims=Lims)
                     Num_Bonds = compute_bonds(Pos_trunc,Types_trunc,periodic=False,Lims=Lims)[1]
 
                     ind_trunc = ind_tot[Pos_trunc_ind[Types_added==1]]
-                    # Bonds_b = compute_bonds_neighbors(Pos_trunc_b,Types_trunc_b,cube=cube+threshold_Si,periodic=False,Lims=Lims)
+                    # Bonds_b = compute_bonds_graph(Pos_trunc_b,Types_trunc_b,cube=cube+threshold_Si,periodic=False,Lims=Lims)
                     Num_Bonds_b = compute_bonds(Pos_trunc_b,Types_trunc_b,periodic=False,Lims=Lims)[1]
 
                     # Num_Bonds_b = np.sum(Bonds_b,axis=0)
@@ -951,12 +951,13 @@ def xor_clean_rm(Cycle_Basis,k,k_long,long=12):
 
 
 
-
 if __name__=="__main__":
-    file = "dump_last_oh.lammpstrj"
+    # file = "dump_last_oh.lammpstrj"
     # file = "dummp_trimmed.lammpstrj"
     # file = "quartz_dupl.data"
-    # file = "dummp_128.lammpstrj"
+    # file = "dummp_256.lammpstrj"
+    file = "dummp_512.lammpstrj"
+    file = "dummp_1024.lammpstrj"
     # file = "dummps_snad_last.lammpstrj"
     # file = "dummps_round_2_last.lammpstrj"
     # file = "dummps_round_3_last.lammpstrj"
@@ -978,12 +979,17 @@ if __name__=="__main__":
     import networkx as nx
 
     # cube = 9
-    # Bonds = compute_bonds_neighbors(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
+    # Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
     # G = nx.from_numpy_array(Bonds)
     # a = time.time()
     # Cycles, L_cycles = count_cycles(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=False)
+    # b= time.time()
     # D = xor_clean_rec(Cycles,1,1,12)
-    # C = xor_clean_rm(D,1,1,12)
+    # c=time.time()
+    # # C = xor_clean_rm(D,1,1,12)
+    # C = xor_clean_rm_2(Pos,D,1,1,12)
+    # d= time.time()
+    # print(d-c)
     # C2 = []
     # for k in C:
     #     C2.append(len(k))
@@ -997,71 +1003,75 @@ if __name__=="__main__":
     # for k,l in zip(L,range(len(L))):
     #     C2_2 = C2_2 + [l]*int(k)
     # plot_cycles(C2_2)
-    # b=time.time()
-    # print(b-a)
+    # e = time.time()
+    # print(e-a)
+
+
+
+    a=time.time()
+    Cube = np.linspace(16,40,20)
+    Cube = np.linspace(8,16,8)
+    Cube = [9.2]
+
+    L_m = []
+    L_p = []
+
+    Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
+    G = nx.from_numpy_array(Bonds)
+    #
+    for cube in Cube:
+        #
+        # Cycles, L_cycles = count_cycles_test(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=True)
+        Cycles, L_cycles = count_cycles(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=False)
+        # D = xor_clean_rec(Cycles,2,2,12)
+        D = xor_clean_rec(Cycles,1,1,12)
+        C = xor_clean_rm(D,1,1,12)
+        # C = xor_clean_rm_2(Pos,D,1,1,12)
+        # print("C",len(C))
+        # C = xor_clean_rm(Cycles,1,1,12)
+        # C = Cycles[:]
+
+        # Cycles = nx.cycle_basis(G)
+        # # D = xor_clean_rec(Cycles,2,2,12)
+        # C = xor_clean_rec(Cycles,1,1,12)
+        # # C = xor_clean_rm(D,1,1,12)
+
+        C2 = []
+        for k in C:
+            C2.append(len(k))
+        # plot_cycles(C2)
+        b=time.time()
+        print(b-a)
+        # print(G.number_of_edges() - G.number_of_nodes() + 1, len(C2), len(C2) - (G.number_of_edges() - G.number_of_nodes() + 1))
+        # print(np.sum(np.array(C2)!=6))
+
+        C = np.zeros((np.max(C2)+1))
+        for k in C2:
+            C[k] += 1
+        print(len(C2),(G.number_of_edges() - G.number_of_nodes() + 1))
+        C = C * (G.number_of_edges() - G.number_of_nodes() + 1) / len(C2)
+        C = C.round()
+        # A = [ 0,  0.,  0., 14., 27. ,42., 19.,  3.] # 128
+        # A = [  0.,   0.,   0.,  19.,  35.,  54., 102. ,  2.,   1.] #256
+        # A = [  0.,   0.,   0.,  30.,  34.,  71., 231.,   5.,   2.] #512
+        A = [  0. ,  0. ,  0. , 39.  ,20.,  67., 581. ,  2.,   0. ,  1.  , 0. ,  1.] #1024
+        Com = np.array(A + [0] * (np.max(C2)+1-len(A)))
+        C = np.array(C.tolist() + [0] * (len(A)-len(C)))
+
+        D = C-Com
+        L_m.append(abs(np.sum(D[D<0])))
+        L_p.append(np.sum(D[D>0]))
+
+    plt.plot(Cube,L_m,"o-r")
+    plt.plot(Cube,L_p,"o-b")
+    plt.show()
+
 
 
 
 
     # a=time.time()
-    # # Cube = np.linspace(16,40,20)
-    # # Cube = np.linspace(8,16,8)
-    # Cube = [9]
-    #
-    # L_m = []
-    # L_p = []
-    #
-    # Bonds = compute_bonds_neighbors(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
-    # G = nx.from_numpy_array(Bonds)
-    # #
-    # for cube in Cube:
-    #
-    #     # Cycles, L_cycles = count_cycles_test(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=True)
-    #     Cycles, L_cycles = count_cycles(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=False)
-    #     # D = xor_clean_rec(Cycles,2,2,12)
-    #     # print(len(Cycles),"A")
-    #     D = xor_clean_rec(Cycles,1,1,12)
-    #     # print("D",len(D))
-    #     C = xor_clean_rm(D,1,1,12)
-    #     # print("C",len(C))
-    #     # C = xor_clean_rm(Cycles,1,1,12)
-    #     # C = Cycles[:]
-    #     C2 = []
-    #     for k in C:
-    #         C2.append(len(k))
-    #     # plot_cycles(C2)
-    #     b=time.time()
-    #     print(b-a)
-    #     # print(G.number_of_edges() - G.number_of_nodes() + 1, len(C2), len(C2) - (G.number_of_edges() - G.number_of_nodes() + 1))
-    #     # print(np.sum(np.array(C2)!=6))
-    #
-    #     C = np.zeros((np.max(C2)+1))
-    #     for k in C2:
-    #         C[k] += 1
-    #
-    #     C = C * (G.number_of_edges() - G.number_of_nodes() + 1) / len(C2)
-    #     C = C.round()
-    #     A = [ 0,  0.,  0., 14., 27. ,42., 19.,  3.] # 128
-    #     # A = [  0.,   0.,   0.,  19.,  35.,  54., 102. ,  2.,   1.] #256
-    #     # A = [  0.,   0.,   0.,  30.,  34.,  71., 231.,   5.,   2.] #512
-    #     # A = [  0. ,  0. ,  0. , 39.  ,20.,  67., 581. ,  2.,   0. ,  1.  , 0. ,  1.] #1024
-    #     Com = np.array(A + [0] * (np.max(C2)+1-len(A)))
-    #     C = np.array(C.tolist() + [0] * (len(A)-len(C)))
-    #
-    #     D = C-Com
-    #     L_m.append(abs(np.sum(D[D<0])))
-    #     L_p.append(np.sum(D[D>0]))
-    #
-    # plt.plot(Cube,L_m,"o-r")
-    # plt.plot(Cube,L_p,"o-b")
-    # plt.show()
-
-
-
-
-
-    # a=time.time()
-    # Bonds = compute_bonds_neighbors(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
+    # Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
     # G = nx.from_numpy_array(Bonds)
     # L = nx.minimum_cycle_basis(G)
     # # C = []
@@ -1084,7 +1094,7 @@ if __name__=="__main__":
 
 
     # a=time.time()
-    # Bonds = compute_bonds_neighbors(Pos,Types,cube=60,periodic=False,Lims=list_BOX[-1])
+    # Bonds = compute_bonds_graph(Pos,Types,cube=60,periodic=False,Lims=list_BOX[-1])
     # b=time.time()
     # print(b-a)
     # # G = min_basis(Cycles)
@@ -1136,7 +1146,7 @@ if __name__=="__main__":
     # # # #
 
 
-    # Bonds = compute_bonds_neighbors(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
+    # Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
     # G = nx.from_numpy_array(Bonds)
     # a = time.time()
     # S = nx.spanner(G,1)

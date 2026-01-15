@@ -106,14 +106,14 @@ def duplicate(Nx_list,Ny_list,Nz,Lims,Atom_type,Atom_pos,rota=0,clean=False,Bond
         return Pos,np.array(Types),Lims_tot, z_lim
 
 
-def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=True,circling=True):
+def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=True,circling=True,do_old_transf=False):
     mean = np.mean(Pos,axis=0)
     mean[2] = np.min(Pos[:,2])
     # mean[2] = 0
     # print(mean)
     Pos = Pos - mean
 
-    Lz = np.max(Pos[:,2]) / 2/np.pi
+    Lz = np.max(Pos[:,2]) / 2 / np.pi
     # print(Lz)
     x,y,z = Pos.transpose()
     z = z/Lz
@@ -125,7 +125,6 @@ def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=T
     # z = y*np.sin(theta) + z*np.cos(theta)
 
 
-    # z_coord = (Lz**2-rota**2*np.pi**2*D**2)**(1/2) *(z-z_lim[0])/Lz
     Lx = np.max(x)
     lx = np.min(x)
     Ly = np.max(y)
@@ -138,6 +137,8 @@ def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=T
     if circling:
         x = (x-lx - LX/2) / LX * 2
         y = (y-ly - LY/2) / LY * 2
+
+
         #FG Squircular Mapping
         # x_coord = x * (x**2 + y**2 - x**2*y**2)**(1/2) / (x**2+y**2)**(1/2)
         # y_coord = y * (x**2 + y**2 - x**2*y**2)**(1/2) / (x**2+y**2)**(1/2)
@@ -167,23 +168,28 @@ def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=T
         x = x_coord * Lx
         y = y_coord * Ly
 
-    # x_coord = x
-    # y_coord = y
-    # x_coord = (x) * np.cos(2*np.pi*rota*(z/Lz)) - (y+D) * np.sin(2*np.pi*rota*(z/Lz))
-    # y_coord = (x) * np.sin(2*np.pi*rota*(z/Lz)) + (y+D) * np.cos(2*np.pi*rota*(z/Lz))-D
+    if do_old_transf:
 
-    R = D * rota
-    Norm = (Lz**2 + R**2)**(1/2)
-    z_coord = Lz * z + R * x / Norm
-    # z_coord = Lz * z
-    y_coord = R * np.cos(z*rota) - np.cos(z*rota) * y + Lz * np.sin(z*rota) / Norm * x
-    x_coord = R * np.sin(z*rota) - np.sin(z*rota) * y - Lz * np.cos(z*rota) / Norm * x
-    # y_coord = R * np.cos(z) - np.cos(z) * y +  np.sin(z) * x
-    # x_coord = R * np.sin(z) - np.sin(z) * y -  np.cos(z) * x
+        # print((Lz**2-rota**2*D**2)**(1/2)*z,np.max(z),np.min(z))
+        Lz = 2*np.pi*Lz
+        z_coord = (Lz**2-rota**2*D**2)**(1/2) *(z)/2/np.pi
+        # z_coord = z * Lz /2 / np.pi
+        x_coord = (x) * np.cos(rota*(z)) - (y+D) * np.sin(rota*(z))
+        y_coord = (x) * np.sin(rota*(z)) + (y+D) * np.cos(rota*(z))-D
 
-    # z_coord = (z_coord >=0.5*Lz) * z_coord +  (z_coord < 0.5*Lz) * (z_coord + Lz)
+    else:
+        R = D * rota
+        Norm = (Lz**2 + D**2)**(1/2)
+        z_coord = Lz * z + D * x / Norm
+        # z_coord = Lz * z
+        y_coord = D * np.cos(z*rota) - np.cos(z*rota) * y + Lz * np.sin(z*rota) / Norm * x
+        x_coord = D * np.sin(z*rota) - np.sin(z*rota) * y - Lz * np.cos(z*rota) / Norm * x
+        # y_coord = R * np.cos(z) - np.cos(z) * y +  np.sin(z) * x
+        # x_coord = R * np.sin(z) - np.sin(z) * y -  np.cos(z) * x
 
-    #This part is used in order not to slide the inside too much
+        # z_coord = (z_coord >=0.5*Lz) * z_coord +  (z_coord < 0.5*Lz) * (z_coord + Lz)
+
+        #This part is used in order not to slide the inside too much
     if slide_z ==0:
         #slide automatic
         slide_z = np.min(z_coord)
@@ -366,7 +372,7 @@ def clean_structure(Pos,Types,Lims,N,periodic=True):
 
 
 
-def create_syst(rota,D,pitch,width,thickness,int_thick,do_correct=True,do_periodic=True,circling=True):
+def create_syst(rota,D,pitch,width,thickness,int_thick,do_correct=True,do_periodic=True,circling=True,do_old_transf=False):
     Lims, Atom_types, Atom_pos = read_data("quartz_clean_test.data")
 
     lx = np.max(Atom_pos[:,0]) - np.min(Atom_pos[:,0])
@@ -401,7 +407,7 @@ def create_syst(rota,D,pitch,width,thickness,int_thick,do_correct=True,do_period
         Pos, Types, Lims_tot, z_lim = duplicate(Nx_list,Ny_list,Nz,Lims,Atom_types,Atom_pos,rota=rota)
         Bonds_OH, Angles_OH = [], []
 
-    Pos_transfo,Lims_tot,slide_z = transfo(Pos,D=D,rota=rota,do_periodic=do_periodic,circling=circling)
+    Pos_transfo,Lims_tot,slide_z = transfo(Pos,D=D,rota=rota,do_periodic=do_periodic,circling=circling,do_old_transf=do_old_transf)
     write_data("quartz_dupl.data",Pos_transfo,Types,Lims_tot,D=D,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH)
 
     if not type(Nx_list) is int:
@@ -439,12 +445,12 @@ if __name__ == "__main__":
     # width = 80
     # thickness = 40
     # int_thick = 10
-    # D = 80
+    # D = 0
     # pitch = 300
-    # width = 60
-    # thickness = 30
-    # int_thick = 10
-    # #
+    # width = 80
+    # thickness = 20
+    # int_thick = 0
+    # # #
     D = 0
     pitch = 15
     width = 10
@@ -452,9 +458,11 @@ if __name__ == "__main__":
     int_thick = 0
 
     # Nx,Ny,Nz = 4,4,4
-    Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,do_correct=False,circling=False)
+    Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,do_correct=False,circling=True,do_old_transf=False)
     # Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,circling=True)
     print("Number of Si : ",np.sum(Types==1))
+
+
 
     # Pos_O = Pos_transfo[Types==2]
     # Dist = sd.cdist(Pos_O,Pos_O)
@@ -476,11 +484,13 @@ if __name__ == "__main__":
         #     Types_int = Types_int[(Pos_transfo_int[:,2]<5) * (Pos_transfo_int[:,2]<10)]
         #     Pos_transfo_int = Pos_transfo_int[(Pos_transfo_int[:,2]<5) * (Pos_transfo_int[:,2]<10)]
 
-        Bonds = compute_bonds(Pos_transfo,Types,periodic=False,Lims=Lims_tot)[0]
+        Bonds = compute_bonds(Pos_transfo,Types)[0]
 
         plotter = pv.Plotter()
         plotter.add_axes()
-
+        plotter.camera.position =  (7.484389257133297, 6.97818741941461, 68.67875875684568)
+        plotter.camera.focal_point = (7.6270507127046585, 7.627050384879112, 10.297490879893303)
+        plotter.camera.roll = -179.09812031149224
         # purple = np.array([96,25,255])/255
         # dark_purple = np.array([56,20,180])/255
 
@@ -543,10 +553,10 @@ if __name__ == "__main__":
 
         Indices = Indices[Bonds.ravel()!=0]
 
-        tubes = [pv.Tube(Pos_Si[i_si],Pos_O[i_o],n_sides=5,radius=0.2) for i_si,i_o in Indices]
-        mesh = tubes[0].merge(tubes[1:])
+        # tubes = [pv.Tube(Pos_Si[i_si],Pos_O[i_o],n_sides=5,radius=0.2) for i_si,i_o in Indices]
+        # mesh = tubes[0].merge(tubes[1:])
 
-        plotter.add_mesh(mesh,opacity=0.3,pbr=True,roughness=.5,metallic=.2,color="white")
+        # plotter.add_mesh(mesh,opacity=0.3,pbr=True,roughness=.5,metallic=.2,color="white")
 
         # tubes = []
         # for k in Angles_OH:

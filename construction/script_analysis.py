@@ -9,10 +9,37 @@ import scipy.sparse.csgraph as sps
 
 
 
-def compute_bonds(Pos,Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=False,Lims=[],do_count_type_3=True):
+def compute_bonds(Pos,Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,do_count_type_3=True):
+    """
+    compute_bonds(Pos,Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,do_count_type_3=True)
+
+    Compute the Bonds of a silica system.
+    |!| This version must only be used for small systems. It takes too much memory otherwise.
+    The types are the following : 1 : Si, 2: O, 3: Oh, 4: H
+
+    Parameters
+    ----------
+    Pos : array
+        The position of the atoms
+    Types : array
+        The type of the Atoms
+    threshold_Si : float, optional
+        The threshold used to consider if Si and O are bonding. 2 by default
+    threshold_O : float, optional
+        The threshold used to consider if O and Si are bonding. 2 by default
+    threshold_H : float, optional
+        The threshold used to consider if O and H are bonding. 1.3 by default
+    do_count_type_3 : bool, optional
+        If one wants to consider the Oh in the calculations.
+
+    Returns
+    -------
+        Bonds, Si_count_O, O_count_Si, O_count_H, H_count_O
+    """
+
     Pos_Si = Pos[Types==1]
     if do_count_type_3:
-        Pos_O = Pos[ ((Types==2) + (Types==3)).astype("bool")]
+        Pos_O = Pos[((Types==2) + (Types==3)).astype("bool")]
     else:
         Pos_O = Pos[ ((Types==2)).astype("bool")]
     Pos_H = Pos[Types==4]
@@ -23,51 +50,13 @@ def compute_bonds(Pos,Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodi
     num_Si = len(Pos_Si)
     num_O = len(Pos_O)
 
-    if periodic:
-        #No need to duplicate H
-        Min_Si_z = np.min(Pos_Si[:,2])
-        Max_Si_z = np.max(Pos_Si[:,2])
-
-
-        Min_O_z = np.min(Pos_O[:,2])
-        Max_O_z = np.max(Pos_O[:,2])
-
-        Arg_min_Si = (Pos_Si[:,2] <= Min_Si_z + 5)
-        Arg_max_Si = (Pos_Si[:,2] >= Max_Si_z - 5)
-
-
-        Min_Si = Pos_Si[Arg_min_Si] + np.array([0,0,Lims[2][1]-Lims[2][0]])
-        Max_Si = Pos_Si[Arg_max_Si] - np.array([0,0,Lims[2][1]-Lims[2][0]])
-
-        Arg_min_O = (Pos_O[:,2] <= Min_O_z + 2)
-        Arg_max_O = (Pos_O[:,2] >= Max_O_z - 2)
-
-        Min_O = Pos_O[Arg_min_O] + np.array([0,0,Lims[2][1]-Lims[2][0]])
-        Max_O = Pos_O[Arg_max_O] - np.array([0,0,Lims[2][1]-Lims[2][0]])
-
-        Pos_Si = np.append(Pos_Si,Min_Si,axis=0)
-        Pos_Si = np.append(Pos_Si,Max_Si,axis=0)
-
-        Pos_O = np.append(Pos_O,Min_O,axis=0)
-        Pos_O = np.append(Pos_O,Max_O,axis=0)
-
-        num_add_min_Si =  np.sum(Arg_min_Si)
-        num_add_max_Si =  np.sum(Arg_max_Si)
-        num_add_Si = num_add_min_Si + num_add_max_Si
-
-        num_add_min_O =  np.sum(Arg_min_O)
-        num_add_max_O =  np.sum(Arg_max_O)
-        num_add_O = num_add_min_O + num_add_max_O
-
-        Arg_min_Si = np.append(Arg_min_Si,[False] * num_add_Si)
-        Arg_max_Si = np.append(Arg_max_Si,[False] * num_add_Si)
-        Arg_min_O = np.append(Arg_min_O,[False] * num_add_O)
-        Arg_max_O = np.append(Arg_max_O,[False] * num_add_O)
+    # There are multiple ways to compute the distance, but this one is the fastest I found
+    Dist = sd.cdist(Pos_Si,Pos_O)
 
     # Pos_Si = Pos_Si.reshape(len(Pos_Si),1,3)
     # Pos_O = Pos_O.reshape(1,len(Pos_O),3)
     # Pos_H = Pos_H.reshape((len(Pos_H),1,3))
-    Dist = sd.cdist(Pos_Si,Pos_O)
+
     # Dist = (Pos_Si - Pos_O) **2
     # Dist = np.einsum("ilj->il",Dist)**(1/2)
 
@@ -80,15 +69,6 @@ def compute_bonds(Pos,Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodi
     # Bonds_Si = Bonds_Si - 1*(Si_Nearest_O > threshold_O)
     # Bonds_O = Bonds_O - 1*(O_Nearest_Si > threshold_Si)
     Bonds =  Bonds_Si + Bonds_O
-
-    if periodic:
-        Bonds[Arg_min_Si,:] = Bonds[Arg_min_Si,:] + Bonds[num_Si : num_Si + num_add_min_Si,:]
-        Bonds[Arg_max_Si,:] = Bonds[Arg_max_Si,:] + Bonds[num_Si + num_add_min_Si : num_Si + num_add_min_Si + num_add_max_Si,:]
-
-        Bonds[:,Arg_min_O] = Bonds[:,Arg_min_O] + Bonds[:,num_O : num_O + num_add_min_O]
-        Bonds[:,Arg_max_O] = Bonds[:,Arg_max_O] + Bonds[:,num_O + num_add_min_O: num_O + num_add_min_O + num_add_max_O]
-
-        Bonds = Bonds[:num_Si,:num_O]
 
 
     Si_count_O = np.sum(Bonds,axis=1)
@@ -105,10 +85,48 @@ def compute_bonds(Pos,Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodi
     return Bonds, Si_count_O, O_count_Si, O_count_H, H_count_O
 
 
-def compute_bonds_neighbors(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[]):
+def compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[]):
+    """
+    compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[])
+
+    Compute the bonds that can be used to create a graph.
+    The output is a neighbor matrix array taht can be converted to a graph using networkx nx.from_numpy_array
+
+    Parameters
+    ----------
+
+    Pos : array
+        The position of the atoms of the system
+    Types: array
+        The types of the atoms of the system
+    cube: float, optional
+        The edge of the cubes used to divide the system, 30 by default. Larger cubes are faster but are more memory intensive
+    threshold_Si : float, optional
+        The threshold used to consider if Si and O are bonding. 2 by default
+    threshold_O : float, optional
+        The threshold used to consider if O and Si are bonding. 2 by default
+    threshold_H : float, optional
+        The threshold used to consider if O and H are bonding. 1.3 by default
+    periodic : bool, optional
+        Compute as if the system was periodic, True by default
+    Lims : list, optional
+        The limits of the system. It is necessary for periodic computations
+
+    Returns
+    -------
+        Neighbor matrix of the system
+
+    """
 
     Lx,Ly,Lz = np.max(Pos,axis=0)
     lx,ly,lz = np.min(Pos,axis=0)
+    if periodic:
+        if len(Lims) == 0:
+            print("No limits were provided, the system will be taken as NON PERIODIC. Use the Lim keyword to add limits")
+            periodic = False
+        else:
+            lz,Lz = Lims[2]
+
 
     Nx = int((Lx - lx) // cube + 1)
     Ny = int((Ly - ly) // cube + 1)
@@ -121,11 +139,15 @@ def compute_bonds_neighbors(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,thres
 
 
     if periodic:
-        Pos_add_z = Pos[:,2] > (Lz - threshold_Si)
-        Pos_remove_z = Pos[:,2] < (lz + threshold_Si)
+        #Adds atoms to the system periodically to account for the periodicity
 
-        Pos_add_Lz = Pos[Pos_add_z] - np.array([[0,0,Lz-lz]])
-        Pos_remove_Lz = Pos[Pos_remove_z] + np.array([[0,0,Lz-lz]])
+        Dz = Lz-lz
+
+        Pos_add_z = Pos[:,2] > (Lz - rdf_max)
+        Pos_remove_z = Pos[:,2] < (lz + rdf_max)
+
+        Pos_add_Lz = Pos[Pos_add_z] - np.array([[0,0,Dz]])
+        Pos_remove_Lz = Pos[Pos_remove_z] + np.array([[0,0,Dz]])
 
         Pos_add = np.append(Pos_add_Lz,Pos_remove_Lz,axis=0)
         Pos_added = np.append(Pos_added,Pos_add,axis=0)
@@ -140,15 +162,15 @@ def compute_bonds_neighbors(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,thres
 
     Num_Si = np.sum(Types_added==1)
     Bonds_tot = np.zeros((Num_Si,Num_Si))
-    # print(Nx,Ny,Nz)
     for x in range(Nx):
-        # print(x,Nx)
         for y in range(Ny):
             for z in range(Nz):
                 # print("LIMS")
                 # print(((x*cube + lx - threshold_Si - 0.2)),((x+1)*cube + lx + threshold_Si + 0.2))
                 # print(((y*cube + ly - threshold_Si - 0.2)),((y+1)*cube + ly + threshold_Si + 0.2))
                 # print(((z*cube + lz - threshold_Si - 0.2)),((z+1)*cube + lz + threshold_Si + 0.2))
+
+                #Slice the system inside this cube
                 Pos_trunc_x = (Pos_added[:,0] > (x*cube + lx - threshold_Si - 0.2)) * (Pos_added[:,0] < ((x+1)*cube + lx + threshold_Si + 0.2))
                 Pos_trunc_y = (Pos_added[:,1] > (y*cube + ly - threshold_Si - 0.2)) * (Pos_added[:,1] < ((y+1)*cube + ly + threshold_Si + 0.2))
                 Pos_trunc_z = (Pos_added[:,2] > (z*cube + lz - threshold_Si - 0.2)) * (Pos_added[:,2] < ((z+1)*cube + lz + threshold_Si + 0.2))
@@ -157,7 +179,7 @@ def compute_bonds_neighbors(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,thres
                 Types_trunc = Types_added[Pos_trunc_ind]
                 if (Types_trunc == 1).any() and (Types_trunc==2).any():
 
-                    Bonds = compute_bonds(Pos_trunc,Types_trunc,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=False,Lims=[])[0]
+                    Bonds = compute_bonds(Pos_trunc,Types_trunc,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H)[0]
                     Bonds = Bonds.astype("float")
                     #Get Bonds Si
                     Bonds = Bonds.dot(Bonds.transpose())
@@ -186,13 +208,47 @@ def compute_bonds_neighbors(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,thres
     return Bonds_tot_or
 
 def compute_hist_neighbors(Pos,Types,cube=100,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[],rdf_max=5):
+    """
+    compute_hist_neighbors(Pos,Types,cube=100,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[],rdf_max=5)
+
+    Computes the Bonds and RDF by slicing the system in multiple subsystems
+
+    Parameters
+    ----------
+
+    Pos : array
+        The position of the atoms of the system
+    Types: array
+        The types of the atoms of the system
+    cube: float, optional
+        The edge of the cubes used to divide the system, 30 by default. Larger cubes are faster but are more memory intensive
+    threshold_Si : float, optional
+        The threshold used to consider if Si and O are bonding. 2 by default
+    threshold_O : float, optional
+        The threshold used to consider if O and Si are bonding. 2 by default
+    threshold_H : float, optional
+        The threshold used to consider if O and H are bonding. 1.3 by default
+    periodic : bool, optional
+        Compute as if the system was periodic, True by default
+    Lims : list, optional
+        The limits of the system. It is necessary for periodic computations
+    rdf_max : float, optional
+        The maximum distance for the RDF. 5 by default
+
+    Returns
+    -------
+        Dist_list, Si_count_O_tot, O_count_Si_tot
+
+    """
 
     Lx,Ly,Lz = np.max(Pos,axis=0)
     lx,ly,lz = np.min(Pos,axis=0)
-    #NEED TO VERIF LIMS BIEN LA
-    lz,Lz = Lims[2]
-    Dz = Lz-lz
-    print(lz,Lz,np.min(Pos[:,2]),np.max(Pos[:,2]))
+    if periodic:
+        if len(Lims) == 0:
+            print("No limits were provided, the system will be taken as NON PERIODIC. Use the Lim keyword to add limits")
+            periodic = False
+        else:
+            lz,Lz = Lims[2]
 
     Nx = int((Lx - lx) // cube + 1)
     Ny = int((Ly - ly) // cube + 1)
@@ -208,8 +264,8 @@ def compute_hist_neighbors(Pos,Types,cube=100,threshold_Si=2,threshold_O=2,thres
         Pos_add_z = Pos[:,2] > (Lz - rdf_max)
         Pos_remove_z = Pos[:,2] < (lz + rdf_max)
 
-        Pos_add_Lz = Pos[Pos_add_z] - np.array([[0,0,Dz]])
-        Pos_remove_Lz = Pos[Pos_remove_z] + np.array([[0,0,Dz]])
+        Pos_add_Lz = Pos[Pos_add_z] - np.array([[0,0,Lz]])
+        Pos_remove_Lz = Pos[Pos_remove_z] + np.array([[0,0,Lz]])
 
         Pos_add = np.append(Pos_add_Lz,Pos_remove_Lz,axis=0)
         Pos_added = np.append(Pos_added,Pos_add,axis=0)
@@ -230,8 +286,7 @@ def compute_hist_neighbors(Pos,Types,cube=100,threshold_Si=2,threshold_O=2,thres
     for x in range(Nx):
         for y in range(Ny):
             for z in range(Nz):
-                # print(np.min(Pos_added[:,2]),lz-rdf_max,np.min(Pos[:,2]),lz)
-
+                #the first slicing is for the system that will the computation will be done to
                 Pos_trunc_x_u = (Pos_added[:,0] >= (x*cube + lx)) * (Pos_added[:,0] < ((x+1)*cube + lx))
                 Pos_trunc_y_u = (Pos_added[:,1] >= (y*cube + ly)) * (Pos_added[:,1] < ((y+1)*cube + ly))
                 Pos_trunc_z_u = (Pos_added[:,2] >= (z*cube + lz)) * (Pos_added[:,2] < ((z+1)*cube + lz))
@@ -239,22 +294,21 @@ def compute_hist_neighbors(Pos,Types,cube=100,threshold_Si=2,threshold_O=2,thres
                 Pos_trunc_uniq = Pos_added[Ind_trunc_uniq]
                 Types_trunc_uniq = Types_added[Ind_trunc_uniq]
 
+                #The second slicing is for the RDF, as it needs a larger distance
                 Pos_trunc_x = (Pos_added[:,0] >= (x*cube + lx - rdf_max)) * (Pos_added[:,0] < ((x+1)*cube + lx + rdf_max))
                 Pos_trunc_y = (Pos_added[:,1] >= (y*cube + ly - rdf_max)) * (Pos_added[:,1] < ((y+1)*cube + ly + rdf_max))
                 Pos_trunc_z = (Pos_added[:,2] >= (z*cube + lz - rdf_max)) * (Pos_added[:,2] < ((z+1)*cube + lz + rdf_max))
                 Pos_trunc_ind = Pos_trunc_x * Pos_trunc_y * Pos_trunc_z
                 Pos_trunc = Pos_added[Pos_trunc_ind]
                 Types_trunc = Types_added[Pos_trunc_ind]
-                # print(np.shape(Pos_added),np.shape(Pos),np.shape(In_trunc),np.shape(Ind_trunc_uniq))
 
                 Ind_trunc_uniq_in_trunc = (Ind_trunc_uniq * In_trunc)[Pos_trunc_ind]
 
                 if (Types_trunc == 1).any() and (Types_trunc == 2).any():
 
-                    Si_count_O = compute_bonds(Pos_trunc,Types_trunc,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=False,do_count_type_3=True)[1]
-                    O_count_Si = compute_bonds(Pos_trunc,Types_trunc,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=False,do_count_type_3=False)[2]
-                    # print(Num_Si_trunc)
-                    # if np.max(Si_count_O==5): print("OUI")
+                    Si_count_O = compute_bonds(Pos_trunc,Types_trunc,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,do_count_type_3=True)[1]
+                    O_count_Si = compute_bonds(Pos_trunc,Types_trunc,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,do_count_type_3=False)[2]
+
 
                     Si_count_O = Si_count_O[Ind_trunc_uniq_in_trunc[(Types_trunc==1).astype("bool")]]
                     Si_index = Ind_trunc_uniq[:Num_at][Types==1]
@@ -282,7 +336,7 @@ def compute_hist_neighbors(Pos,Types,cube=100,threshold_Si=2,threshold_O=2,thres
 
 def plot_syst(Pos,Types,Cycles=None,L_cycles=None):
 
-    Bonds, Si_count_O, O_count_Si, O_count_H, H_count_O = compute_bonds(Pos,Types,periodic=False)
+    Bonds, Si_count_O, O_count_Si, O_count_H, H_count_O = compute_bonds(Pos,Types)
 
     plotter = pv.Plotter()
     plotter.add_axes()
@@ -487,34 +541,6 @@ def analyze_plot_syst(Pos,Types,periodic=False,Lims=[],draw_limit=5,compute_limi
 # def compute_analysis(Pos,Types,hist_Dens,hist_Si,hist_O,hist_H,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=False,Lims=[],rdf_max=5):
 def compute_analysis(Pos,Types,hist_Dens,hist_Si,hist_O,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=False,Lims=[],rdf_max=5):
 
-    # Pos_Si = Pos[Types==1]
-    # Pos_O = Pos[Types==2]
-    #
-    # Dist = sd.cdist(Pos_Si,Pos_O)
-    #
-    #
-    # Dist_trunc = Dist[Dist<5]
-    # Dist_trunc = Dist_trunc + (Dist_trunc==0)*100
-    #
-    #
-    # Dens_trunc = Dist_trunc
-    # if periodic:
-    #     Pos_dupl_O_pz = Pos_O + np.array([0,0,Lims[2][1]])
-    #     # Dist_dupl_O_pz = (Pos_Si - Pos_dupl_O_pz)**2
-    #     # Dist_dupl_O_pz = np.einsum("ilj->il",Dist_dupl_O_pz)**(1/2)
-    #     Dist_dupl_O_pz = sd.cdist(Pos_Si,Pos_dupl_O_pz)
-    #
-    #
-    #     Pos_dupl_O_nz = Pos_O - np.array([0,0,Lims[2][1]])
-    #     # Dist_dupl_O_nz = (Pos_Si - Pos_dupl_O_nz)**2
-    #     # Dist_dupl_O_nz = np.einsum("ilj->il",Dist_dupl_O_nz)**(1/2)
-    #     Dist_dupl_O_nz = sd.cdist(Pos_Si,Pos_dupl_O_nz)
-    #
-    #     Dens_trunc = np.append(Dens_trunc,Dist_dupl_O_pz)
-    #     Dens_trunc = np.append(Dens_trunc,Dist_dupl_O_nz)
-
-
-    # Bonds, Si_count_O, O_count_Si, O_count_H = compute_bonds(Pos,Types,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=periodic,Lims=Lims)[:4]
     Dist_list, Si_count_O, O_count_Si = compute_hist_neighbors(Pos,Types,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=periodic,Lims=Lims,rdf_max=rdf_max)
     #
     Dist_list = [k for j in Dist_list for k in j]
@@ -593,7 +619,7 @@ def plot_analysis(Counts_Hists,Counts,hist_Dens,hist_Si,hist_O):
 def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,rdf_max=5,periodic=False,Lims=[],anim=False,save=False):
     fig,ax = plt.subplots()
     if save:
-        fig,ax = plt.subplots(figsize=(10,6),dpi=200)
+        fig,ax = plt.subplots(figsize=(8,6),dpi=200)
         plt.rcParams.update({'font.size': 15})
         plt.rcParams['svg.fonttype'] = 'none'
 
@@ -610,35 +636,40 @@ def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,thr
 
     plt.subplot(2,1,1)
     hist_Dens = plt.hist(np.array([]),bins=100,range=(0,5),color=purple,edgecolor=dark_purple,linewidth=1,label="A")
-    plt.title("RDF Si-O")
-    plt.ylabel("Number")
+    plt.title("RDF Si-O",color=dark_purple)
+    plt.ylabel("Number",color=dark_purple)
+    plt.xlabel("Distance (A)",color=dark_purple)
+    plt.xticks(color=purple)
+    plt.yticks(color=purple)
     plt.xlim(0,5)
     plt.ylim(0,num_O*2)
 
     plt.subplot(2,2,3)
     hist_Si = plt.hist(np.array([]),bins=12,range=(0,6),color=purple,edgecolor=dark_purple,linewidth=1,label="A")
-    plt.title("Number of Bonds for Si")
-    plt.xlabel("Number of Bonds")
-    plt.ylabel("Number of Si")
-    plt.xticks([k+0.25 for k in range(7)],[k for k in range(7)])
-    plt.ylim(0,num_Si*1.5)
+    plt.title("Number of Bonds for Si",color=dark_purple)
+    plt.xlabel("Number of Bonds",color=dark_purple)
+    plt.ylabel("Number of Si",color=dark_purple)
+    plt.xticks([k+0.25 for k in range(7)],[k for k in range(7)],color=purple)
+    plt.yticks(color=purple)
+    plt.ylim(0,num_Si*1.2)
 
 
     plt.subplot(2,2,4)
     hist_O = plt.hist(np.array([]),bins=12,range=(0,6),color=purple,edgecolor=dark_purple,linewidth=1,label="A")
     # hist_H = plt.hist(np.array([]),bins=12,range=(0,6),color="blue",edgecolor="darkblue",linewidth=1,label="A")
-    plt.xticks([k+0.25 for k in range(7)],[k for k in range(7)])
-    plt.title("Number of Bonds for O")
-    plt.xlabel("Number of Bonds")
-    plt.ylabel("Number of O")
-    plt.ylim(0,num_O*1.5)
+    plt.xticks([k+0.25 for k in range(7)],[k for k in range(7)],color=purple)
+    plt.yticks(color=purple)
+    plt.title("Number of Bonds for O",color=dark_purple)
+    plt.xlabel("Number of Bonds",color=dark_purple)
+    plt.ylabel("Number of O",color=dark_purple)
+    plt.ylim(0,num_O*1.2)
 
     if anim:
         plt.show(block=False)
 
 
 
-    list_Counts_Hists,list_Counts = [],[]
+    list_Counts_Hists,list_Counts = [], []
     for tstep in range(len(list_Tstep)):
         Hist_Counts,Counts = compute_analysis(list_Pos[tstep],list_Types[tstep],hist_Dens,hist_Si,hist_O,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=periodic,Lims=Lims,rdf_max=rdf_max)
         # Hist_Counts,Counts = compute_analysis(list_Pos[tstep],list_Types[tstep],hist_Dens,hist_Si,hist_O,hist_H,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=periodic,Lims=Lims,rdf_max=rdf_max)
@@ -665,7 +696,8 @@ def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,thr
 
     if save:
         update(list_Tstep[-1])
-        plt.savefig("Analysis.svg")
+        plt.tight_layout()
+        plt.savefig("analysis.svg")
 
 
 
@@ -804,22 +836,85 @@ def analyze_defects(Pos,Types,periodic=False,Lims=[],Cycles=None,L_cycles=None):
 
 
 
+def quicksurf(Pos,N_list=[20,20,80],alpha=1):
+    Lx,Ly,Lz = np.max(Pos,axis=0)
+    lx,ly,lz = np.min(Pos,axis=0)
+
+    Nx,Ny,Nz = N_list
+
+    cube = np.zeros((Nx,Ny,Nz))
+    x = np.linspace(lx,Lx,Nx,endpoint=True)
+    y = np.linspace(ly,Ly,Ny,endpoint=True)
+    z = np.linspace(lz,Lz,Nz,endpoint=True)
+
+    dx = x[1]-x[0]
+    dy = y[1]-y[0]
+    dz = z[1]-z[0]
+
+    cube_coords = x.reshape((1,Nx,1,1))*np.array([1.,0,0]).reshape((3,1,1,1)) + \
+        y.reshape((1,1,Ny,1))*np.array([0,1.,0]).reshape((3,1,1,1)) + \
+        z.reshape((1,1,1,Nz))*np.array([0,0,1.]).reshape((3,1,1,1))
+
+    grid = pv.RectilinearGrid(x,y,z)
+
+    def slider_precision(value):
+        for x in range(Nx):
+            for y in range(Ny):
+                for z in range(Nz):
+                    cube_pos = cube_coords[:,x,y,z].reshape((1,3))
+
+                    Pos_trunc_x = (Pos[:,0] >= (x * dx - value)) * (Pos[:,0] < (x * dx + value))
+                    Pos_trunc_y = (Pos[:,1] >= (y * dy - value)) * (Pos[:,1] < (y * dy + value))
+                    Pos_trunc_z = (Pos[:,2] >= (z * dz - value)) * (Pos[:,2] < (z * dz + value))
+                    Ind_trunc = Pos_trunc_x * Pos_trunc_y * Pos_trunc_z
+                    Pos_trunc = Pos[Ind_trunc]
+                    Dist = sd.cdist(cube_pos, Pos_trunc)
+
+                    cube[x,y,z] = np.sum(np.exp(-Dist**2/alpha))
+
+
+
+        cube_density = cube / np.sum(cube)
+
+        array_sort = np.argsort(cube_density,axis=None)[::-1]
+        cube_sorted = cube_density.flatten()[array_sort]
+        cube_values_sorted = np.cumsum(cube_sorted)
+
+        #Find how to unsort the array. There should be a more efficient way to do this
+        indexes = np.arange(len(array_sort),dtype=int)
+        array_unsort = np.zeros(len(array_sort),dtype=int)
+
+        for k in range(len(array_sort)):
+            array_unsort[array_sort[k]] = indexes[k]
+        cube_values = cube_values_sorted[array_unsort]
+
+
+        contour= grid.contour(isosurfaces=[0.8],scalars=cube_values)
+        plotter.add_mesh(contour,name="contour",opacity=1.0,pbr=True,roughness=.5,metallic=.2,color="red")
+
+
+    plotter = pv.Plotter()
+
+    plotter.add_slider_widget(slider_precision, [0.5,8],value=1,title="Precision", fmt="%1.1f")
+    plotter.show(full_screen=False)
 
 
 if __name__=="__main__":
     # file = "dump_last_oh.lammpstrj"
     # file = "dummp_trimmed.lammpstrj"
-    # file = "dummp_twisted_last.lammpstrj"
-    # file = "dummp_700_last.lammpstrj"
+    # file = "dummps_snad_last.lammpstrj"
+    file = "dummp_700_last.lammpstrj"
     # file = "dummp_twisted_long.lammpstrj"
-    file = "quartz_dupl.data"
+    # file = "quartz_dupl.data"
     # file = "dummps_snad_last.lammpstrj"
     # file = "dummps_round_2_last.lammpstrj"
     # file = "dummps_round_3_last.lammpstrj"
     # file = "dummps_long_last.lammpstrj"
+    # file = "dummp_trimmed_long_0K.lammpstrj"
+    # file = "dummp_trimmed_0K_last.lammpstrj"
 
-    # list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
-    list_BOX,list_ATOMS = read_data(file,do_scale=False)
+    list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
+    # list_BOX,list_ATOMS = read_data(file,do_scale=False)
     list_TSTEP=[0]
 
     list_Pos = list_ATOMS[:,:,2:]
@@ -831,5 +926,6 @@ if __name__=="__main__":
 
     # analyze(Pos,Types,periodic=True,Lims=list_BOX[-1])
     # plot_syst(Pos,Types,Lims=list_BOX[-1])
-    analyze_mult(list_TSTEP,list_Pos,list_Types,periodic=False,Lims=list_BOX[-1],save=False)
+    analyze_mult(list_TSTEP,list_Pos,list_Types,periodic=False,Lims=list_BOX[-1],save=True)
+    # quicksurf(Pos,N_list=[40,40,40],alpha=0.5)
     # analyze_defects(Pos,Types,periodic=True,Lims=list_BOX[-1])
