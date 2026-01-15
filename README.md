@@ -2,7 +2,7 @@
 SHAnC
 </h1>
 
-SHAnC (Silica Helices Analysis & Construction)
+SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used to Construct and Analyze Silica Helices.
 
 - **Github :** https://github.com/re-gr/SHAnC
 
