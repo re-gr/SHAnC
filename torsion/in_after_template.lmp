@@ -1,0 +1,81 @@
+units metal
+boundary p p p
+dimension 3
+
+atom_style full
+
+variable step_calc equal PY_STEP_CALC
+variable dump_dt equal PY_DUMP_DT
+variable step equal PY_STEP_READ
+
+variable dump_write string PY_DUMP_WRITE
+variable dump_read string PY_DUMP_READ
+
+region box block 0 1 0 1 0 1
+create_box 5 box
+read_dump ${dump_read} ${step} x y z add yes box yes
+
+group del_pot type 4
+group del_pot type 5
+delete_atoms group del_pot
+
+mass 1 28.0855
+mass 2 15.9994
+mass 3 1.0080
+
+set type 1 charge +2.4
+set type 2 charge -1.2
+set type 3 charge +0.6
+
+
+pair_style hybrid/overlay buck/coul/long 5 lj/cut 1.2
+pair_coeff 1 1 buck/coul/long 0.0 1.0 0.0
+pair_coeff 1 2 buck/coul/long 18003.7572 0.2052 133.5381
+pair_coeff 1 2 lj/cut 2.0 1.2 1.2
+pair_coeff 2 2 buck/coul/long 1388.7730 0.36232 175.00 
+pair_coeff 2 2 lj/cut 2.6 1.6
+pair_coeff 3 1 buck/coul/long 0.0 1.0 0.0
+pair_coeff 3 2 buck/coul/long 44017.985421 0.117413 12.500000
+pair_coeff 3 3 buck/coul/long 0.0 1.0 0.0
+
+
+bond_style harmonic
+bond_coeff 1 23.98 0.95
+
+angle_style harmonic
+angle_coeff 1 8.4124 118
+
+
+neighbor 2.0 bin
+
+kspace_style pppm 1.0e-4
+
+dump dummp all atom 1 ${dump_write}
+dump_modify dummp sort id
+
+group 1 id 1 2
+velocity 1 create 2000.0 123
+
+
+
+#compute r all property/atom xu yu zu
+
+
+unfix T
+fix T all npt temp 2000.0 2000.0 0.05 iso 1 1 0.1
+thermo_style custom step temp press etotal vol lx ly lz
+thermo 100
+timestep 0.001
+
+run ${step_calc}
+
+unfix T
+fix T all npt temp 2000.0 300.0 0.05 iso 1 1 0.1
+thermo_style custom step temp press etotal vol lx ly lz
+thermo 100
+timestep 0.001
+
+run ${step_calc}
+
+dump_modify dummp every 1
+minimize 1.0e-6 1.0e-6 1000 10000
