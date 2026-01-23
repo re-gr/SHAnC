@@ -1,5 +1,7 @@
 from distorsion import *
+from read_write import *
 import pyvista as pv
+import numpy as np
 
 
 
@@ -82,34 +84,41 @@ if __name__ == "__main__":
     # thickness = 20
     # int_thick = 0
 
-    plotter = pv.Plotter(window_size=(800,1000),off_screen=False)
+    plotter = pv.Plotter(window_size=(800,1000),off_screen=True)
 
     # plotter = pv.Plotter(window_size=(800,1200),off_screen=True)
     plotter.open_gif("ff.gif",fps=30,loop=0,subrectangles=True)
 
     Rota = np.linspace(0,1.0,60,endpoint=True)
+    # Rota = [1]
 
     plotter.camera.position = (295.6231897664369, 746.0477923773544, 152.16749019607207)
     plotter.camera.focal_point = (44.89679345803219, 21.573329011011676, 179.7240602502272)
     plotter.camera.roll = -82.89593545907061
+
+
     plotter.camera.distance = 767.1286322572582
     #
     # nx,ny,nz = 40,20,150
     # x_i = np.linspace(0,80,nx,endpoint=True)
     # y_i = np.linspace(0,40,ny,endpoint=True)
     # z_i = np.linspace(0,300,nz,endpoint=True)
-    nx,ny,nz = 10,5,75
-    x_i = np.linspace(0,80,nx,endpoint=True)
-    y_i = np.linspace(0,40,ny,endpoint=True)
-    z_i = np.linspace(0,300,nz,endpoint=True)
-    # z_i = np.linspace(0,150,nz,endpoint=True)
-
-    X,Y,Z = np.meshgrid(x_i,y_i,z_i)
-
-
-    Pos = np.array([X,Y,Z]).transpose((1,2,3,0))
+    # nx,ny,nz = 10,5,75
+    # x_i = np.linspace(0,80,nx,endpoint=True)
+    # y_i = np.linspace(0,40,ny,endpoint=True)
+    # z_i = np.linspace(0,300,nz,endpoint=True)
+    # # z_i = np.linspace(0,150,nz,endpoint=True)
+    #
+    # X,Y,Z = np.meshgrid(x_i,y_i,z_i)
+    #
+    #
+    # Pos = np.array([X,Y,Z]).transpose((1,2,3,0))
+    file = "quartz_dupl.data"
+    list_BOX,list_ATOMS = read_data(file,do_scale=False)
+    Pos = list_ATOMS[-1][:,2:]
+    Types = list_ATOMS[-1][:,1]
     ##AA
-    Pos = Pos.reshape((nx*ny*nz,3))
+    # Pos = Pos.reshape((nx*ny*nz,3))
 
     # x_i = np.linspace(0,80,nx,endpoint=True)
     # y_i = np.linspace(0,40,ny,endpoint=True)
@@ -130,19 +139,30 @@ if __name__ == "__main__":
 
 
     for rota in Rota:
+        print(rota)
         # Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,do_periodic=False)
 
-        Pos_transfo,slide_z,mean = transfo(Pos,slide_z=0,D=D,rota=rota,do_periodic=False,circling=False,do_old_transf=True)
+        Pos_transfo,slide_z,mean = transfo(Pos,slide_z=0,D=D,rota=rota,do_periodic=False,circling=False)
         # Pos_transfo2,slide_z,mean = transfo(Pos2,slide_z=-150,D=D,rota=rota,do_periodic=False,circling=False,do_old_transf=True)
         # x,y,z = Pos_transfo
 
+        Si_c = [240,200,160]
+        O_c = [255,13,13]
+        H_c = [255,255,255]
 
         # grid = pv.PolyData(x,y,z)
-        data = pv.PolyData(Pos_transfo)
-        sp = pv.Sphere(radius=1.5)
+        sp = pv.Sphere(radius=0.5)
+        data = pv.PolyData(Pos_transfo[Types==1])
         pc = data.glyph(scale=False,geom=sp,orient=False)
         # grid2 = pv.PolyData(Pos_transfo2)
-        plotter.add_mesh(pc,name="a",opacity=1.0,pbr=False,roughness=0.6,metallic=0.8,color=[56,0,180])
+        # plotter.add_mesh(pc,name="a",opacity=1.0,pbr=False,roughness=0.6,metallic=0.8,color=[56,0,180])
+        plotter.add_mesh(pc,name="a",opacity=1.0,pbr=False,roughness=0.6,metallic=0.8,color=Si_c)
+        data = pv.PolyData(Pos_transfo[((Types==2)+(Types==3)).astype("bool")])
+        pc = data.glyph(scale=False,geom=sp,orient=False)
+        plotter.add_mesh(pc,name="b",opacity=1.0,pbr=False,roughness=0.6,metallic=0.8,color=O_c)
+        # data = pv.PolyData(Pos_transfo[Types==4])
+        # pc = data.glyph(scale=False,geom=sp,orient=False)
+        # plotter.add_mesh(pc,name="a",opacity=1.0,pbr=False,roughness=0.6,metallic=0.8,color=H_c)
         # plotter.add_mesh(grid2,name="b",opacity=1.0,pbr=True,roughness=0.6,metallic=0.8,color=[180,0,0],render_points_as_spheres=True)
         # grid = pv.StructuredGrid(x,y,z)
         # plotter.add_mesh(grid,name="a",opacity=1.0,pbr=True,roughness=0.6,metallic=0.8,color=[56,0,180])
@@ -172,11 +192,10 @@ if __name__ == "__main__":
                 plotter.add_mesh(grid_2,name="b{}".format(z_l),color="white",pbr=True,roughness=0.6,metallic=1.0,diffuse=True)
 
 
-        plotter.camera.position = (295.6231897664369, 746.0477923773544, 152.16749019607207)
-        plotter.camera.focal_point = (44.89679345803219, 21.573329011011676, 179.7240602502272)
-        plotter.camera.roll = -82.89593545907061
-        plotter.camera.distance = 767.1286322572582
-
+        plotter.camera.position = (348.4549496860325, 898.7281199829653, 174.9236611702855)
+        plotter.camera.focal_point = (45.34104694754356, 21.453087227997283, 185.5691750213504)
+        plotter.camera.roll = -86.92312560218731
+        plotter.camera.distance =  928.2256450312831
 
         plotter.write_frame()
     plotter.write_frame()
@@ -186,4 +205,4 @@ if __name__ == "__main__":
     plotter.write_frame()
 
 
-    plotter.close()
+    # plotter.close()
