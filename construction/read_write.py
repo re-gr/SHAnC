@@ -66,18 +66,18 @@ def read_dump(dump_file,unscale=False):
         list_NUM_AT = [list_NUM_AT[-1]]
         list_BOX = [list_BOX[-1]]
         list_ATOMS = np.array([list_ATOMS[-1]])
+    if unscale:
+        C_min = np.mean(list_ATOMS[:,:,2:],axis=1) + np.array([Lx/2,Ly/2,Lz/2])
+        C_min[:,2] = 0
 
-    C_min = np.mean(list_ATOMS[:,:,2:],axis=1) + np.array([Lx/2,Ly/2,Lz/2])
-    C_min[:,2] = 0
-
-    # print(np.shape(C_min))
-    C_min = C_min.reshape((len(C_min),1,3))
-    list_ATOMS[:,:,2:] = list_ATOMS[:,:,2:] - C_min
-    list_ATOMS[:,:,2] = list_ATOMS[:,:,2] % Lx
-    list_ATOMS[:,:,3] = list_ATOMS[:,:,3] % Ly
-    list_ATOMS[:,:,4] = (list_ATOMS[:,:,4]-BOX[2][0]) % Lz + BOX[2][0]
-    # Pos_Z = list_ATOMS[:,:,4]
-    # list_ATOMS[:,:,4] = (Pos_Z-Lz) * (Pos_Z > Lz) + (Pos_Z-Lz) * (Pos_Z > Lz)
+        # print(np.shape(C_min))
+        C_min = C_min.reshape((len(C_min),1,3))
+        list_ATOMS[:,:,2:] = list_ATOMS[:,:,2:] - C_min
+        list_ATOMS[:,:,2] = list_ATOMS[:,:,2] % Lx
+        list_ATOMS[:,:,3] = list_ATOMS[:,:,3] % Ly
+        list_ATOMS[:,:,4] = (list_ATOMS[:,:,4]-BOX[2][0]) % Lz + BOX[2][0]
+        # Pos_Z = list_ATOMS[:,:,4]
+        # list_ATOMS[:,:,4] = (Pos_Z-Lz) * (Pos_Z > Lz) + (Pos_Z-Lz) * (Pos_Z > Lz)
 
     return list_TSTEP, list_NUM_AT, list_BOX, np.array(list_ATOMS)
 
@@ -211,8 +211,11 @@ def write_data(file_name,Pos,Types,Lims,D=0,Bonds_OH=[],Angles_OH=[]):
         H_present = True
 
     bonds = False
+    angles = False
     if len(Bonds_OH) > 0:
         bonds = True
+    if len(Angles_OH) > 0:
+        angles = True
 
     with open(file_name,"w") as file:
         file.write("\n")
@@ -222,6 +225,7 @@ def write_data(file_name,Pos,Types,Lims,D=0,Bonds_OH=[],Angles_OH=[]):
         if bonds and H_present:
             file.write("{} bonds".format(len(Bonds_OH)))
             file.write("\n")
+        if angles and H_present:
             file.write("{} angles".format(len(Angles_OH)))
             file.write("\n")
         file.write("\n")
@@ -232,6 +236,7 @@ def write_data(file_name,Pos,Types,Lims,D=0,Bonds_OH=[],Angles_OH=[]):
         if bonds and H_present:
             file.write("1 bond types")
             file.write("\n")
+        if angles and H_present:
             file.write("1 angle types")
             file.write("\n")
 
@@ -275,6 +280,7 @@ def write_data(file_name,Pos,Types,Lims,D=0,Bonds_OH=[],Angles_OH=[]):
             for num,bond in zip(range(len(Bonds_OH)),Bonds_OH):
                 file.write("{} 1 {} {}\n".format(num+1,bond[0],bond[1]))
 
+        if angles and H_present:
             file.write("\n")
             file.write("Angles")
             file.write("\n")
@@ -285,8 +291,9 @@ def write_data(file_name,Pos,Types,Lims,D=0,Bonds_OH=[],Angles_OH=[]):
 if __name__ == "__main__":
     # list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump("dumps_compiled.lammpstrj")
     # write_dump("dumps_trimmed.lammpstrj",list_TSTEP[::10], list_NUM_AT[::10], list_BOX[::10], list_ATOMS[::10])
-    list_BOX,list_ATOMS = read_data("quartz_dupl.data",do_scale=False)
-    write_dump("quartz_dupl.lammpstrj",[0], [len(list_ATOMS[0])], list_BOX, list_ATOMS)
+    # list_BOX,list_ATOMS = read_data("quartz_dupl.data",do_scale=False)
+    # write_dump("quartz_dupl.lammpstrj",[0], [len(list_ATOMS[0])], list_BOX, list_ATOMS)
+    convert_dump_to_xyz("demo/dummps_round_3_last.lammpstrj")
 
 
 

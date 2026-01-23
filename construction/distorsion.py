@@ -158,16 +158,14 @@ def clean_structure(Pos,Types,Lims,N,periodic=True):
     """
 
 
-    Center = (Lims[0][1]*N[0][0] - Lims[0][0])/2
-    Bonds, Si_count_O, O_count_Si = compute_bonds(Pos,Types,Lims=Lims*N,periodic=periodic)[:3]
+    Center = [(Lims[0][1]*N[0][0] - Lims[0][0])/2,(Lims[1][1]*N[1][0] - Lims[1][0])/2, (Lims[2][1]*N[2][0] - Lims[2][0])/2]
+    Dist_list, Si_count_O, O_count_Si = compute_hist_neighbors(Pos,Types,Lims=Lims*N,periodic=periodic)[:3]
 
     Pos_Si = Pos[Types==1]
     Pos_O = Pos[Types==2]
 
     #The Si that have only 2 bonds are located on the edges
     Lack_Si = Pos_Si[Si_count_O == 2]
-
-
 
     Atoms_add_pos = []
     Atoms_add_types = []
@@ -176,8 +174,8 @@ def clean_structure(Pos,Types,Lims,N,periodic=True):
 
     for Si in Lack_Si:
         #Add OH next to a Lack_Si on the x axis at 1.6 A and 2.6 A
-        Atom_O_add = np.sign(Si[0]-Center) * np.array([1.6,0,0]) + Si
-        Atom_H_add = np.sign(Si[0]-Center) * np.array([2.6,0,0]) + Si
+        Atom_O_add = np.sign(Si[0]-Center[0]) * np.array([1.6,0,0]) + Si
+        Atom_H_add = np.sign(Si[0]-Center[0]) * np.array([2.6,0,0]) + Si
 
         Atoms_add_pos.append(Atom_O_add)
         Atoms_add_pos.append(Atom_H_add)
@@ -186,14 +184,15 @@ def clean_structure(Pos,Types,Lims,N,periodic=True):
         Bonds_OH.append([num_at,num_at+1])
 
 
-        #Get the closest O symmetric with respect to the plane x
+        #Get the closest O symmetric with respect to the plane yz and xz
         Pos_O_trunc = Pos_O[(Pos_O[:,2] > (Si[2]-2)) * (Pos_O[:,2] < (Si[2]+2))]
-        Si_symm = np.array([2*Center-Si[0],Si[1],Si[2]])
+        #The factor should be 2, but 2.2 is used in order to make sure to not put the OH inside
+        Si_symm = np.array([2*Center[0] -Si[0],Si[1], Si[2]])
         #This suppose a orthogonal system
         Dist_O = np.sum((Pos_O_trunc - Si_symm.reshape((1,3)))**2,axis=1)
         Pos_O_add_H = Pos_O_trunc[np.argmin(Dist_O)]
         #Add the H atom to the symmetric O
-        Atom_H_add = np.sign(Pos_O_add_H-Center) * np.array([1.0,0,0]) + Pos_O_add_H
+        Atom_H_add = np.sign(Pos_O_add_H-Center[0]) * np.array([1.0,0,0.0]) + Pos_O_add_H
         Atoms_add_pos.append(Atom_H_add)
         Atoms_add_types.append(4)
 
@@ -233,7 +232,7 @@ def clean_structure(Pos,Types,Lims,N,periodic=True):
         Dist_Si = np.sum((Pos_Si_trunc - O.reshape((1,3)))**2,axis=1)
 
         Index_Si_trunc = (New_Types==1) * (New_Pos[:,2] > (O[2]-2)) * (New_Pos[:,2] < (O[2]+2))
-        Index_Si_bond = np.argmax((np.cumsum(Index_Si_trunc)-1) == np.argmin(Dist_Si))
+        Index_Si_bond = np.argmax((np.cumsum(Index_Si_trunc)-1) == (np.argmin(Dist_Si)))
         Angles_OH.append([Index_Si_bond+1,bond[0],bond[1]])
 
 
@@ -351,11 +350,11 @@ def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=T
         #And to transform the cuboid along these directions : one normal corresponds to y, the other to x and the tangent to x
 
         R = D * rota
-        Norm = (Lz**2 + D**2)**(1/2)
+        Norm = (Lz**2 + R**2)**(1/2)
 
-        z_coord = Lz * z + D * x / Norm
-        y_coord = D * np.cos(z*rota) - np.cos(z*rota) * y + Lz * np.sin(z*rota) / Norm * x
-        x_coord = D * np.sin(z*rota) - np.sin(z*rota) * y - Lz * np.cos(z*rota) / Norm * x
+        z_coord = Lz * z + R * x / Norm
+        y_coord = R * np.cos(z*rota) - np.cos(z*rota) * y + Lz * np.sin(z*rota) / Norm * x
+        x_coord = R * np.sin(z*rota) - np.sin(z*rota) * y - Lz * np.cos(z*rota) / Norm * x
 
 
 
@@ -381,9 +380,9 @@ def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=T
 
 
 
-def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data"):
+def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False):
     """
-    create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data")
+    create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False)
 
     This functions creates the whole system using the dimensions stated.
     It creates two files : quartz_dupl.data and quartz_int.data which contains the data of the surface and the data of the cast respectively.
@@ -410,6 +409,8 @@ def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic
             Use the rota transformation instead of the helix one. This should not be used as it gives much worse structure. By default False
         file_duplicate : float, optional,
             the file containing the lattice that will be duplicated
+        do_angles : bool, optional
+            write the angles SiOH
 
     Returns
     -------
@@ -463,6 +464,8 @@ def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx_list,Ny_list,3,Lims,Atom_types,Atom_pos)
         Pos, Types, Bonds_OH, Angles_OH = clean_structure(Pos,Types,Lims,N_list,periodic=True)
         Pos, Types, Lims_tot, Bonds_OH, Angles_OH = duplicate(1,1,Nz,Lims,Types,Pos,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH)
+        if not do_angles:
+            Angles_OH = []
     else:
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx_list,Ny_list,Nz,Lims,Atom_types,Atom_pos)
         Bonds_OH, Angles_OH = [], []
@@ -492,11 +495,11 @@ if __name__ == "__main__":
     # rota = 0.0
 
     #Real system
-    # D = 167
-    # pitch = 600
-    # width = 200
-    # thickness = 110
-    # int_thick = 35
+    D = 167
+    pitch = 600
+    width = 200
+    thickness = 110
+    int_thick = 35
 
     #System
     # D = 40
@@ -507,11 +510,11 @@ if __name__ == "__main__":
     # int_thick = 10
 
     #Smaller system
-    D = 40
-    pitch = 150
-    width = 40
-    thickness = 30
-    int_thick = 10
+    # D = 40
+    # pitch = 150
+    # width = 40
+    # thickness = 30
+    # int_thick = 10
 
     #Miniature system used for tests
     # D = 0
@@ -522,7 +525,7 @@ if __name__ == "__main__":
 
 
 
-    Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=False,circling=True,do_rota_transf=False)
+    Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,circling=True,do_rota_transf=False)
     # Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,circling=True)
     print("Number of Si : ",np.sum(Types==1))
 
@@ -539,7 +542,7 @@ if __name__ == "__main__":
     if 0:
         import pyvista as pv
 
-        Bonds = compute_bonds(Pos_transfo,Types)[0]
+        # Bonds = compute_bonds(Pos_transfo,Types)[0]
 
         plotter = pv.Plotter()
         plotter.add_axes()
@@ -549,7 +552,9 @@ if __name__ == "__main__":
 
         Si_c = [240,200,160]
         O_c = [255,13,13]
+        O_c2 = [0,255,0]
         H_c = [255,255,255]
+        H_c2 = [0,0,255]
 
         sp = pv.Sphere(radius=0.4)
 
@@ -566,11 +571,11 @@ if __name__ == "__main__":
         if np.sum(Types==3):
             data = pv.PolyData(Pos_transfo[Types==3])
             pc = data.glyph(scale=False,geom=sp,orient=False)
-            plotter.add_mesh(pc,opacity=0.9,pbr=True,roughness=.5,metallic=.2,color=O_c)
+            plotter.add_mesh(pc,opacity=0.9,pbr=True,roughness=.5,metallic=.2,color=O_c2)
 
             data = pv.PolyData(Pos_transfo[Types==4])
             pc = data.glyph(scale=False,geom=sp,orient=False)
-            plotter.add_mesh(pc,opacity=0.9,pbr=True,roughness=.5,metallic=.2,color=H_c)
+            plotter.add_mesh(pc,opacity=0.9,pbr=True,roughness=.5,metallic=.2,color=H_c2)
 
         if type(Types_int) is type(np.array([])):
             data = pv.PolyData(Pos_transfo_int[Types_int==1])
@@ -581,20 +586,20 @@ if __name__ == "__main__":
             pc = data.glyph(scale=False,geom=sp,orient=False)
             plotter.add_mesh(pc,opacity=1.0,pbr=True,roughness=.5,metallic=.2,color="green")
 
-        #Plot the bonds
-        if 0:
-            N_Si,N_O = np.shape(Bonds)
-            Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
-            Pos_Si = Pos_transfo[Types==1]
-            Pos_O = Pos_transfo[(Types==2)+(Types==3)]
-
-            Indices = Indices[Bonds.ravel()!=0]
-
-            tubes = [pv.Tube(Pos_Si[i_si],Pos_O[i_o],n_sides=5,radius=0.2) for i_si,i_o in Indices]
-            mesh = tubes[0].merge(tubes[1:])
-
-            plotter.add_mesh(mesh,opacity=0.3,pbr=True,roughness=.5,metallic=.2,color="white")
-
+        #Plot the bonds / angles
+        if 1:
+            # N_Si,N_O = np.shape(Bonds)
+            # Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
+            # Pos_Si = Pos_transfo[Types==1]
+            # Pos_O = Pos_transfo[(Types==2)+(Types==3)]
+            #
+            # Indices = Indices[Bonds.ravel()!=0]
+            #
+            # tubes = [pv.Tube(Pos_Si[i_si],Pos_O[i_o],n_sides=5,radius=0.2) for i_si,i_o in Indices]
+            # mesh = tubes[0].merge(tubes[1:])
+            #
+            # plotter.add_mesh(mesh,opacity=0.3,pbr=True,roughness=.5,metallic=.2,color="white")
+            #
             tubes = []
             for k in Angles_OH:
                 tubes.append(pv.Tube(Pos_transfo[k[0]-1],Pos_transfo[k[1]-1],n_sides=5,radius=0.2))
