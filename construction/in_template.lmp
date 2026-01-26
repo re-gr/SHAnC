@@ -5,13 +5,13 @@ dimension 3
 atom_style full
 
 variable step_calc equal 10000
-variable step_calc_2 equal 50000
+variable step_calc_2 equal 10000
 variable dump_dt equal 1
 
 variable dump_write string dummp.lammpstrj
 
-read_data quartz_dupl.data extra/atom/types 2
-read_data quartz_int.data add append offset 4 0 0 0 0
+read_data quartz_dupl_full.data extra/atom/types 2
+read_data quartz_int_full.data add append offset 4 0 0 0 0
 
 
 
@@ -49,8 +49,8 @@ pair_coeff 2 3 lj/cut 2.6 1.6 1.6
 
 
 pair_coeff 4 1 buck/coul/long 0.0 1.0 0.0
-pair_coeff 4 2 buck/coul/long 44017.985421 0.117413 12.500000
-pair_coeff 4 3 buck/coul/long 44017.985421 0.117413 12.500000
+pair_coeff 4 2 buck/coul/long 50.0 0.3 0.0
+pair_coeff 4 3 buck/coul/long 0.0 1.0 0.0
 pair_coeff 4 4 buck/coul/long 0.0 1.0 0.0
 
 pair_coeff 1 5 buck/coul/long 0.0 1.0 0.0
@@ -87,16 +87,20 @@ kspace_style pppm 1.0e-4
 dump dummp all atom 1 ${dump_write}
 dump_modify dummp sort id
 
-group sio type 1 2 3
-group h type 4
-velocity sio create 300.0 123
-
-
+dump_modify dummp every 1
 minimize 1.0e-6 1.0e-6 1000 10000
 
 dump_modify dummp every 100
 
-fix T sio nvt temp 300.0 2000.0 0.05
+
+group sio type 1 2 3
+group h type 4
+velocity sio create 300.0 123
+velocity h create 300.0 321
+
+
+
+fix T sio nvt temp 300.0 1500.0 0.05
 fix Th h nvt temp 300 300 0.05
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
@@ -104,19 +108,19 @@ timestep 0.0005
 
 run ${step_calc}
 
-velocity sio create 2000.0 321
+velocity sio create 1500.0 321
 
-fix T sio nvt temp 2000.0 2000.0 0.05
-fix Th h nvt temp 300 300 0.05
+fix T sio nvt temp 1500.0 1500.0 0.1
+fix Th h nvt temp 300 300 0.1
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
 timestep 0.001
 
 run ${step_calc_2}
 
-velocity sio create 2000.0 213
+velocity sio create 1500.0 213
 
-fix T sio nvt temp 2000.0 300.0 0.05
+fix T sio nvt temp 1500.0 300.0 0.05
 fix Th h nvt temp 300 300 0.05
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
@@ -131,7 +135,7 @@ delete_atoms group del_pot
 velocity sio create 300.0 312
 
 unfix T
-fix T sio nvt temp 300.0 2000.0 0.05
+fix T sio nvt temp 300.0 1500.0 0.05
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
 timestep 0.0005
@@ -139,20 +143,20 @@ timestep 0.0005
 run ${step_calc}
 
 
-velocity sio create 2000.0 1023
+velocity sio create 1500.0 1023
 
 unfix T
-fix T sio nvt temp 2000.0 2000.0 0.1
+fix T sio nvt temp 1500.0 1500.0 0.1
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
 timestep 0.001
 
 run ${step_calc_2}
 
-velocity sio create 2000.0 1203
+velocity sio create 1500.0 1203
 
 unfix T
-fix T sio npt temp 2000.0 2000.0 0.05 iso 1 1 0.5
+fix T sio npt temp 1500.0 1500.0 0.05 iso 1 1 0.5
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
 timestep 0.0005
@@ -160,20 +164,20 @@ timestep 0.0005
 run ${step_calc}
 
 
-velocity sio create 2000.0 1302
+velocity sio create 1500.0 1302
 
 unfix T
-fix T sio npt temp 2000.0 2000.0 0.05 iso 1 1 0.5
+fix T sio npt temp 1500.0 1500.0 0.05 iso 1 1 0.5
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
 timestep 0.001
 
 run ${step_calc_2}
 
-velocity sio create 2000.0 1230
+velocity sio create 1500.0 1230
 
 unfix T
-fix T sio npt temp 2000.0 0.1 0.05 iso 1 1 0.5
+fix T sio npt temp 1500.0 0.1 0.05 iso 1 1 0.5
 thermo_style custom step temp press etotal vol lx ly lz
 thermo 100
 timestep 0.0005
