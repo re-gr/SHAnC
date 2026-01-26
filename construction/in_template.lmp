@@ -77,8 +77,8 @@ pair_coeff 6 3 lj/cut 2.6 1.6 1.6
 bond_style harmonic
 bond_coeff 1 23.98 0.95
 
-angle_style harmonic
-angle_coeff 1 8.4124 118
+#angle_style harmonic
+#angle_coeff 1 8.4124 118
 
 
 neighbor 2.0 bin
