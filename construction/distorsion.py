@@ -380,7 +380,7 @@ def transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=T
 
 
 
-def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False):
+def create_syst(rota,D_exp,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False):
     """
     create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False)
 
@@ -391,8 +391,8 @@ def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic
     ----------
         rota : float
             the amount of turns made by the helix
-        D : float
-            the diameter of the circle inside the helix
+        D_exp : float
+            the diameter of the circle containing the helix.
         pitch : float
             the pitch, or the period of the helix
         width : float
@@ -435,11 +435,15 @@ def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic
     Lims, Atom_types, Atom_pos = read_data(file_duplicate,do_scale=False,atom_style="atom")
 
     #Get the number of duplication needed to get the proper dimensions
-    lx = np.max(Atom_pos[:,0]) - np.min(Atom_pos[:,0])
-    ly = np.max(Atom_pos[:,1]) - np.min(Atom_pos[:,1])
-    lz = np.max(Atom_pos[:,2]) - np.min(Atom_pos[:,2])
+    lx = Lims[0][1] - Lims[0][0]
+    ly = Lims[1][1] - Lims[1][0]
+    lz = Lims[2][1] - Lims[2][0]
+    # lx = np.max(Atom_pos[:,0]) - np.min(Atom_pos[:,0])
+    # ly = np.max(Atom_pos[:,1]) - np.min(Atom_pos[:,1])
+    # lz = np.max(Atom_pos[:,2]) - np.min(Atom_pos[:,2])
 
     Nx = int(width // lx +1)
+
     Ny = int(thickness // ly +1)
     Nz = int(pitch // lz +1)
 
@@ -457,6 +461,20 @@ def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic
 
     print(Nx_list,Ny_list,Nz)
 
+    #due to the transformation, the D is not the same as the one experimentally
+    #It is however possible to find the D corresponding to the transformation
+    if circling:
+        #The maximum distance is taken on the ellipse
+        D_transfo = ((D**2 - width**2) / ((1 + thickness**2 / (width**2 - thickness**2))))**(1/2) /2
+    else:
+        D_transfo = ((D**2 - width**2)**(1/2) - thickness)/2
+    if D < width:
+        D_transfo = 0
+    # print("Old D", D_transfo)
+    #
+    # print(2*(width**2/4 + D_transfo**2 * (1+(thickness**2/(width**2-thickness**2))) ) ** (1/2))
+
+
     ##Surface
     if do_clean:
         #create one slab that is corrected then duplicated Nz times
@@ -470,15 +488,15 @@ def create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx_list,Ny_list,Nz,Lims,Atom_types,Atom_pos)
         Bonds_OH, Angles_OH = [], []
 
-    Pos_transfo,Lims_tot,slide_z = transfo(Pos,D=D,rota=rota,do_periodic=do_periodic,circling=circling,do_rota_transf=do_rota_transf)
-    write_data("quartz_dupl.data",Pos_transfo,Types,Lims_tot,D=D,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH)
+    Pos_transfo,Lims_tot,slide_z = transfo(Pos,D=D_transfo,rota=rota,do_periodic=do_periodic,circling=circling,do_rota_transf=do_rota_transf)
+    write_data("quartz_dupl.data",Pos_transfo,Types,Lims_tot,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH)
 
     ##Inside
     if not type(Nx_list) is int:
         Nx_int = Nx_list[1:3]
         Ny_int = Ny_list[1:3]
         Pos_int, Types_int, Lims_tot_int, _a, _b = duplicate(Nx_int,Ny_int,Nz,Lims,Atom_types,Atom_pos)
-        Pos_transfo_int ,Lims_tot_int,slide_z = transfo(Pos_int,D=D,rota=rota,slide_z=slide_z,do_periodic=do_periodic,circling=circling)
+        Pos_transfo_int ,Lims_tot_int,slide_z = transfo(Pos_int,D=D_transfo,rota=rota,slide_z=slide_z,do_periodic=do_periodic,circling=circling)
         write_data("quartz_int.data",Pos_transfo_int,Types_int,Lims_tot_int,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH)
     else:
         Pos_transfo_int = None
@@ -495,14 +513,14 @@ if __name__ == "__main__":
     # rota = 0.0
 
     #Real system
-    D = 167
-    pitch = 600
-    width = 200
-    thickness = 110
-    int_thick = 35
+    # D = 271
+    # pitch = 453
+    # width = 226
+    # thickness = 112
+    # int_thick = 35
 
     #System
-    # D = 40
+    # D = 100
     # D = 0
     # pitch = 300
     # width = 80
@@ -510,7 +528,7 @@ if __name__ == "__main__":
     # int_thick = 10
 
     #Smaller system
-    # D = 40
+    # D = 100
     # pitch = 150
     # width = 40
     # thickness = 30
@@ -522,13 +540,20 @@ if __name__ == "__main__":
     # width = 10
     # thickness = 10
     # int_thick = 0
-
+    D = 150
+    pitch = 200
+    width = 60
+    thickness = 30
+    int_thick=0
 
 
     Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,circling=True,do_rota_transf=False)
     # Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,circling=True)
-    print("Number of Si : ",np.sum(Types==1))
 
+    print("Number of Si : ",np.sum(Types==1))
+    # plt.plot(np.sort(Pos_transfo[:,0]),"o-r")
+    # plt.show()
+    print("Diameter of the system : ",(np.max(Pos_transfo[:,0])-np.min(Pos_transfo[:,0])))
 
     #Do the analysis
     if 0:
@@ -587,7 +612,7 @@ if __name__ == "__main__":
             plotter.add_mesh(pc,opacity=1.0,pbr=True,roughness=.5,metallic=.2,color="green")
 
         #Plot the bonds / angles
-        if 1:
+        if 0:
             # N_Si,N_O = np.shape(Bonds)
             # Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
             # Pos_Si = Pos_transfo[Types==1]
