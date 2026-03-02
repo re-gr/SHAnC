@@ -3,8 +3,10 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from read_write import *
 import pyvista as pv
+import scipy as sp
 import scipy.spatial.distance as sd
-import scipy.sparse.csgraph as sps
+import scipy.signal as sps
+
 
 
 
@@ -325,7 +327,7 @@ def compute_hist_neighbors(Pos,Types,cube=100,threshold_Si=2,threshold_O=2,thres
 
 
 
-def plot_syst(Pos,Types,Cycles=None,L_cycles=None):
+def plot_syst(Pos,Types,do_bonds=True,Cycles=None,L_cycles=None):
     """
     plot_syst(Pos,Types,Cycles=None,L_cycles=None)
 
@@ -349,8 +351,6 @@ def plot_syst(Pos,Types,Cycles=None,L_cycles=None):
             A graph is produced
 
     """
-    Bonds, Si_count_O, O_count_Si, O_count_H, H_count_O = compute_bonds(Pos,Types)
-
     plotter = pv.Plotter()
     plotter.add_axes()
 
@@ -368,25 +368,29 @@ def plot_syst(Pos,Types,Cycles=None,L_cycles=None):
     pc = data.glyph(scale=False,geom=sp,orient=False)
     plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color=Colors_O)
 
+    if (Types==3).any():
+        sp = pv.Sphere(radius=0.2)
+        Colors_H = "gray"
+        data = pv.PolyData(Pos[Types==3])
+        pc = data.glyph(scale=False,geom=sp,orient=False)
+        plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color=Colors_H)
 
-    sp = pv.Sphere(radius=0.2)
-    Colors_H = "gray"
-    data = pv.PolyData(Pos[Types==3])
-    pc = data.glyph(scale=False,geom=sp,orient=False)
-    plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color=Colors_H)
+    if do_bonds:
 
+        Bonds, Si_count_O, O_count_Si, O_count_H, H_count_O = compute_bonds(Pos,Types)
 
-    N_Si,N_O = np.shape(Bonds)
-    Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
+        N_Si,N_O = np.shape(Bonds)
+        Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
 
-    Pos_Si = Pos[Types==1]
-    Pos_O = Pos[Types==2]
+        Pos_Si = Pos[Types==1]
+        Pos_O = Pos[Types==2]
 
-    Indices = Indices[Bonds.ravel()!=0]
+        Indices = Indices[Bonds.ravel()!=0]
 
-    tubes = [pv.Tube(Pos_Si[i_si],Pos_O[i_o],n_sides=5,radius=0.2) for i_si,i_o in Indices]
-    mesh = tubes[0].merge(tubes[1:])
-    plotter.add_mesh(mesh,opacity=0.3,pbr=True,roughness=.5,metallic=.2,color="blue")
+        tubes = [pv.Tube(Pos_Si[i_si],Pos_O[i_o],n_sides=5,radius=0.2) for i_si,i_o in Indices]
+        mesh = tubes[0].merge(tubes[1:])
+        plotter.add_mesh(mesh,opacity=0.3,pbr=True,roughness=.5,metallic=.2,color="blue")
+
     if not type(Cycles) is type(None) and type(L_cycles) is type(None):
         Pos_Si = Pos[Types==1]
         print(len(Pos_Si))
@@ -582,7 +586,7 @@ def analyze_plot_syst(Pos,Types,periodic=False,Lims=[],draw_limit=5,compute_limi
 
 
 
-def compute_analysis(Pos,Types,hist_Dens,hist_Si,hist_O,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=False,Lims=[],rdf_max=5):
+def compute_analysis(Pos,Types,hist_Dens,hist_Si,hist_O,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=False,Lims=[],rdf_max=5,density=True):
     """
     compute_analysis(Pos,Types,hist_Dens,hist_Si,hist_O,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=False,Lims=[],rdf_max=5)
 
@@ -599,24 +603,28 @@ def compute_analysis(Pos,Types,hist_Dens,hist_Si,hist_O,threshold_Si=2,threshold
     num_si_6 = np.sum(Si_count_O==6)
     num_o_1 = np.sum(O_count_Si==1)
     num_o_3 = np.sum(O_count_Si==3)
-
-    print("Bonds < 1.5 A : {}".format(num_inf_15))
-    print("Bonds < 1.55 A : {}".format(num_inf_155))
-    print("3 Bonds Si : {}".format(num_si_3))
-    print("5 Bonds Si : {}".format(num_si_5))
-    print("6 Bonds Si : {}".format(num_si_6))
-    print("1 Bonds O : {}".format(num_o_1))
-    print("3 Bonds O : {}".format(num_o_3))
+    N_at = len(Pos)
+    print("Bonds < 1.5 A : {}, {:3.3f}%".format(num_inf_15,num_inf_15/N_at*4/3*100))
+    print("Bonds < 1.55 A : {}, {:3.3f}%".format(num_inf_155,num_inf_155/N_at*4/3*100))
+    print("3 Bonds Si : {}, {:3.3f}%".format(num_si_3,num_si_3/N_at*3*100))
+    print("5 Bonds Si : {}, {:3.3f}%".format(num_si_5,num_si_5/N_at*3*100))
+    print("6 Bonds Si : {}, {:3.3f}%".format(num_si_6,num_si_6/N_at*3*100))
+    print("1 Bonds O : {}, {:3.3f}%".format(num_o_1,num_o_1/N_at*3/2*100))
+    print("3 Bonds O : {}, {:3.3f}%".format(num_o_3,num_o_3/N_at*3/2*100))
 
 
 
     hist_Dens, radius = np.histogram(Dist_list,hist_Dens[1])
-    #get the sliding average of the edges
-    radius = ((np.roll(radius,1) + radius) / 2)[1:]
-    dr = radius[1] - radius[0]
-    hist_Dens = hist_Dens / (4*np.pi*radius**2*dr) / np.sum(Types==1)
-    # hist_Dens = hist_Dens / np.sum(Types==1)
-    # hist_Dens = np.histogram(Dens_trunc,hist_Dens[1])[0]
+
+    if density:
+        #get the sliding average of the edges
+        radius = ((np.roll(radius,1) + radius) / 2)[1:]
+        dr = radius[1] - radius[0]
+        hist_Dens = hist_Dens / (4*np.pi*radius**2*dr) / np.sum(Types==1)
+    else:
+        # hist_Dens = hist_Dens / np.sum(Types==1)
+        # hist_Dens = np.histogram(Dens_trunc,hist_Dens[1])[0]
+        pass
     hist_Si = np.histogram(Si_count_O,hist_Si[1])[0]
     hist_O = np.histogram(O_count_Si,hist_O[1])[0]
     # hist_H = np.histogram(O_count_H,hist_H[1])[0]
@@ -670,9 +678,9 @@ def plot_analysis(Counts_Hists,Counts,hist_Dens,hist_Si,hist_O):
         hist_O[2].set_label("O-Si Bonds {}".format(Counts[1]))
 
 
-def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,rdf_max=5,periodic=False,Lims=[],anim=False,save=False):
+def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,rdf_max=5,periodic=False,Lims=[],anim=False,save=False,vline=1.609,density=True):
     """
-    analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,rdf_max=5,periodic=False,Lims=[],anim=False,save=False)
+    analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,threshold_H=1.3,rdf_max=5,periodic=False,Lims=[],anim=False,save=False,vline=1.609)
 
     This functions computes the RDF and saturation and plots them on a graph. It supports multiple data, and there is a slider to navigate between the different timesteps
 
@@ -700,6 +708,8 @@ def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,thr
             Do an animation of the rdf and saturation with respect to the timestep. False by default
         save : bool, optional
             Save the graph in a svg graph instead of showing it. will only save the last timestep. False by default
+        vline : float, optional
+            Adds a vertical line to the graph. 1.609 by default
 
     Returns
     -------
@@ -725,16 +735,20 @@ def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,thr
 
     purple = np.array([96,25,255])/255
     dark_purple = np.array([56,20,180])/255
+    dark_dark_purple = np.array([34,10,120])/255
 
     plt.subplot(2,1,1)
     hist_Dens = plt.hist(np.array([]),bins=100,range=(0,5),color=purple,edgecolor=dark_purple,linewidth=1,label="A")
     plt.title("RDF Si-O",color=dark_purple)
     plt.ylabel("Number",color=dark_purple)
     plt.xlabel("Distance (A)",color=dark_purple)
-    plt.xticks(color=purple)
+    plt.xticks([k for k in range(int(rdf_max))]+[vline],[k for k in range(int(rdf_max))]+[vline],color=purple)
     plt.yticks(color=purple)
+    # vline = (int(vline*40) +1)/40
+    plt.axvline(vline,color=dark_dark_purple)
     plt.xlim(0,5)
-    plt.ylim(0,2)
+    if density: plt.ylim(0,2)
+    else: plt.ylim(0,num_O*1.5)
 
     plt.subplot(2,2,3)
     hist_Si = plt.hist(np.array([]),bins=12,range=(0,6),color=purple,edgecolor=dark_purple,linewidth=1,label="A")
@@ -763,7 +777,7 @@ def analyze_mult(list_Tstep,list_Pos,list_Types,threshold_Si=2,threshold_O=2,thr
 
     list_Counts_Hists,list_Counts = [], []
     for tstep in range(len(list_Tstep)):
-        Hist_Counts,Counts = compute_analysis(list_Pos[tstep],list_Types[tstep],hist_Dens,hist_Si,hist_O,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=periodic,Lims=Lims,rdf_max=rdf_max)
+        Hist_Counts,Counts = compute_analysis(list_Pos[tstep],list_Types[tstep],hist_Dens,hist_Si,hist_O,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=periodic,Lims=Lims,rdf_max=rdf_max,density=density)
         # Hist_Counts,Counts = compute_analysis(list_Pos[tstep],list_Types[tstep],hist_Dens,hist_Si,hist_O,hist_H,threshold_Si=threshold_Si,threshold_O=threshold_O,threshold_H=threshold_H,periodic=periodic,Lims=Lims,rdf_max=rdf_max)
         if anim:
             slider.set_val(list_Tstep[tstep])
@@ -911,6 +925,44 @@ def analyze_defects(Pos,Types,periodic=False,Lims=[],Cycles=None,L_cycles=None,d
     plotter.add_mesh(smooth,name="contour",opacity=0.1,pbr=True,roughness=.5,metallic=.2,color="red")
 
     plotter.show()
+
+
+def save_defects(file_name,Pos,Types,periodic=False,Lims=[]):
+    """
+    analyze_defects(Pos,Types,periodic=False,Lims=[],Cycles=None,L_cycles=None)
+
+
+    """
+    D, Si_count_O, O_count_Si =  compute_hist_neighbors(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=periodic,Lims=Lims,rdf_max=5)
+
+
+    Count_Si_0 = (Si_count_O==0)
+    Count_Si_1 = (Si_count_O==1)
+    Count_Si_2 = (Si_count_O==2)
+    Count_Si_3 = (Si_count_O==3)
+    Count_Si_4 = (Si_count_O==4)
+    Count_Si_5 = (Si_count_O==5)
+    Count_Si_6 = (Si_count_O==6)
+    Count_Si_7 = (Si_count_O==7)
+    Count_Si_8 = (Si_count_O==8)
+
+    Count_O_0 = (O_count_Si==0)
+    Count_O_1 = (O_count_Si==1)
+    Count_O_2 = (O_count_Si==2)
+    Count_O_3 = (O_count_Si==3)
+    Count_O_4 = (O_count_Si==4)
+    Count_O_5 = (O_count_Si==5)
+    Count_O_6 = (O_count_Si==6)
+
+    Types[Types==1] = Count_Si_4 * 1 + Count_Si_0 * 5 + Count_Si_1 * 6 + Count_Si_2 * 7 + Count_Si_3 * 8 + Count_Si_5 * 9 + Count_Si_6 * 10 + Count_Si_7 * 11 + Count_Si_8 * 12
+    Types[Types==2] = Count_O_2 * 2 + Count_O_0 * 13 + Count_O_1 * 14 + Count_O_3 * 15 + Count_O_4 * 16 + Count_O_5 * 17 + Count_O_6 * 18
+
+    write_xyz(file_name,Pos,Types)
+
+
+
+
+
 
 def compute_quick_surface(Pos,grid,Lims,alpha=2,prec=20,d=10,length_box=20,N_th=8):
     """
@@ -1119,11 +1171,35 @@ def curvature_analysis(Pos,prec=20,d=10,length_box=20):
         #Remove <0 and >1
         colors = (colors > 0) * (colors < 1) * colors + (colors>=1) * 1
 
-        C = np.sum(colors,axis=1)
-        print(np.min(C),np.max(C))
+        # C = np.sum(colors,axis=1)
+        # print(np.min(C),np.max(C))
+        import time
+        a=time.time()
+        colors_blur = np.zeros(np.shape(colors))
+        Pos_points_surface = smooth.points
+        x,y,z = Pos_points_surface.transpose()
+
+        for pos, color, color_index in zip(Pos_points_surface,colors,range(len(colors))):
+            pos_x,pos_y,pos_z = pos
+            Pos_box_x = ((x) >= (pos_x - length_box/2)) * ((x) <= ((pos_x) + length_box/2))
+            Pos_box_y = ((y) >= (pos_y - length_box/2)) * ((y) <= ((pos_y) + length_box/2))
+            Pos_box_z = ((z) >= (pos_z - length_box/2)) * ((z) <= ((pos_z) + length_box/2))
+
+            Pos_close = Pos_points_surface[Pos_box_x*Pos_box_y*Pos_box_z]
+            Colors_close = colors[Pos_box_x*Pos_box_y*Pos_box_z]
+
+            Dist_close =  sd.cdist([pos],Pos_close)[0]
+            # print(Dist_close)
+            Dist_close = (Dist_close<1)*1 + (Dist_close>1)*Dist_close
 
 
-        plotter.add_mesh(smooth,name="contour",opacity=1.0,scalars=colors,rgb=True)
+            colors_blur[color_index] = np.sum(Colors_close.transpose()/Dist_close**2,axis=1) / np.sum(1/Dist_close**2)
+        print(time.time()-a)
+
+
+
+        # plotter.add_mesh(smooth,name="contour",opacity=1.0,scalars=colors,rgb=True)
+        plotter.add_mesh(smooth,name="contour",opacity=1.0,scalars=colors_blur,rgb=True)
         # plotter.add_mesh(smooth,name="contour",opacity=1.0,scalars=curv_min,clim=(-norm,norm))
 
         return cube
@@ -1143,7 +1219,6 @@ def curvature_analysis(Pos,prec=20,d=10,length_box=20):
 
 
     plotter.show(full_screen=False)
-
 
 def analyze_density(Pos,periodic=False,Lims=[],d_spacing=5,isovalue=5.,alpha=2.,prec=20,d=10,length_box=20,smoothing=1000,N_th=8,rdf_max=20):
     """
@@ -1167,7 +1242,7 @@ def analyze_density(Pos,periodic=False,Lims=[],d_spacing=5,isovalue=5.,alpha=2.,
     grid = pv.ImageData(dimensions=(Nx,Ny,Nz),origin=(lx-d,ly-d,lz-d),spacing=(d_spacing,d_spacing,d_spacing))
     Lims = [[Lx,lx],[Ly,ly],[Lz,lz]]
 
-    cube = compute_quick_surface(Pos,grid,Lims,alpha=alpha,prec=prec,d=d,length_box=length_box,N_th=8)
+    cube = compute_quick_surface(Pos,grid,Lims,alpha=alpha,prec=prec,d=d,length_box=length_box,N_th=N_th)
     contour = grid.contour(isosurfaces=(isovalue),scalars=cube)
     if smoothing != 0:
         smooth = contour.smooth(n_iter=int(smoothing))
@@ -1188,30 +1263,910 @@ def analyze_density(Pos,periodic=False,Lims=[],d_spacing=5,isovalue=5.,alpha=2.,
 
     print(np.min(Density),np.max(Density))
     Density  = Density / np.max(Density)
-    plotter.add_mesh(smooth,name="contour",opacity=1.0,cmap="cool",scalars=Density)
+    plotter.add_mesh(smooth,name="contour",opacity=1.0,cmap="cool",scalars=Density,scalar_bar_args={"title":"Density"})
 
     plotter.show()
 
 
 
-if __name__=="__main__":
+def transfo_inv(Pos_transfo,D,P,slice_thickness=5):
+    """
+    This function computes the inverse transformation of a list of transformed position
+    """
 
-    # file = "demo/quartz_dupl.data"
-    # list_BOX,list_ATOMS = read_data(file,do_scale=False)
+    #Because of the sliding due to the issue with periodicity
+    #The basis of the helix is often not at z = 0
+    Pos_slice = Pos_transfo[Pos_transfo[:,2] < (slice_thickness + np.min(Pos_transfo[:,2]))]
+    mean_slice = np.mean(Pos_slice)
+
+
+    mean = np.mean(Pos_transfo,axis=0)
+    # print(mean)
+    mean[2] = 0
+    u,v,w = (Pos_transfo - mean).transpose()
+    # u,v,w = (Pos_transfo).transpose()
+
+    # u,v,w = (Pos_transfo).transpose()
+    #if unlucky and a point has u=0. Should not happen because if would mean that there are no holes inside
+    u = u + (u==0) * 0.00001
+    P_t = P/2/np.pi
+    R = D
+    print('R',R)
+    # R = 29.133407802862774
+    # P_t = 32.677991490301196
+    # R=40
+
+
+
+
+    Lim = R/P_t**2 * (v**2+u**2)**(1/2)
+    Lim_m = w/P_t - Lim
+    Lim_M = w/P_t + Lim
+    Nz = 500
+    z = np.linspace(Lim_m,Lim_M, Nz)
+    # z = z%(2*np.pi)
+
+
+
+    #z is found by finding the roots of this equation
+    equation_z = abs(P_t*z - R/P_t * (np.sign(u) * (v**2+u**2)**(1/2) * np.cos((z + np.arctan(v/u)))) - w)
+    roots_z_ind = []
+    for curv in equation_z.transpose():
+        ind_mins = np.array(sps.argrelmin(curv,mode="wrap")[0])
+        values_mins = curv[ind_mins]
+
+        # ind_mins = ind_mins[values_mins<0.5]
+
+        # if len(ind_mins)==0:
+        #     plt.plot(curv,"or")
+        #     plt.show()
+
+        ind_mins_center = abs(ind_mins-Nz//2)
+        # print(ind_mins,ind_mins_center)
+        roots_z_ind_curv = ind_mins[np.argmin(ind_mins_center)]
+        roots_z_ind.append(roots_z_ind_curv)
+
+    roots_z_ind = np.array(roots_z_ind)
+
+
+
+    # equation_z = abs(P_t*z + R/P_t * (np.sin(z)*v - np.cos(z)*u)  - w)
+    # roots_z_ind = np.argmin(equation_z,axis=0)
+    # print(np.shape(roots_z_ind))
+    # print("Max err",np.max(np.min(equation_z,axis=0)))
+
+
+    roots_z = np.take_along_axis(z,np.expand_dims(roots_z_ind,0),axis=0)[0]
+    print("Max err",np.max(abs(P_t*roots_z - R/P_t * (np.sign(u) * (v**2+u**2)**(1/2) * np.cos((roots_z + np.arctan(v/u)))) - w)))
+
+    # roots_z = roots_z%(2*np.pi)
+    # roots_z = roots_z + np.min(roots_z) + np.pi
+
+    N = (R**2 + P_t**2)**(1/2)
+    print("N",N)
+    print("P_t",P_t)
+
+    # print(np.min(z),np.max(z))
+    x = N/P_t * (-np.cos(roots_z)*u + np.sin(roots_z)*v)
+    y = R - np.sin(roots_z)*u - np.cos(roots_z)*v
+    # y = R - np.sin(roots_z)*u/2 - np.cos(roots_z)*v/2
+
+    # print(np.max(u),np.max(v))
+    # print(np.max(x),np.max(y))
+
+    d = np.argmax(x)
+    # print(np.shape(equation_z))
+    # plt.plot(z[:,d],equation_z[:,d],"or")
+    # plt.show()
+
+    return x,y,roots_z * P_t
+
+
+
+
+
+def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,threshold_lr=2,show=False):
+    def Rz(alpha):
+        """3D Rotation matrix around the z axis"""
+        return np.array([[np.cos(alpha),-np.sin(alpha),0],[np.sin(alpha),np.cos(alpha),0],[0,0,1]])
+    def Ry(beta):
+        """3D Rotation matrix around the y axis"""
+        return np.array([[np.cos(beta),0,np.sin(beta)],[0,1,0],[-np.sin(beta),0,np.cos(beta)]])
+    def Rx(gamma):
+        """3D Rotation matrix around the x axis"""
+        return np.array([[1,0,0],[0,np.cos(gamma),-np.sin(gamma)],[0,np.sin(gamma),np.cos(gamma)]])
+    def Rota(alpha):
+        return np.array([[np.cos(alpha),-np.sin(alpha)],[np.sin(alpha),np.cos(alpha)]])
+
+
+
+    def calc_dist(Pos,xa,ya,xb,yb):
+        Vec = np.array([xb-xa,yb-ya])
+
+        Vec_d_a = Pos - np.array([xa,ya])
+        Vec_d_b = Pos - np.array([xb,yb])
+
+        D_a = np.linalg.norm(Vec_d_a,axis=1)
+        D_b = np.linalg.norm(Vec_d_b,axis=1)
+        # print(np.shape(Vec))
+        # print(np.shape(Vec_d_a), np.shape(D_a), np.shape(D_a < D_b))
+        Vec = Vec.reshape((1,2))
+
+        D_a_sup_b = (D_a > D_b).reshape((len(D_a),1))
+        D_b_sup_a = (D_a <= D_b).reshape((len(D_b),1))
+
+        Vec_calc = Vec * D_b_sup_a - Vec * D_a_sup_b
+        Vec_d_calc = Vec_d_a * D_b_sup_a + Vec_d_b * D_a_sup_b
+
+        cos_angle = np.sum(Vec_d_calc * Vec_calc,axis=1) / np.linalg.norm(Vec_d_calc,axis=1) / np.linalg.norm(Vec_calc,axis=1)
+        cos_angle = (cos_angle > 1) * 1 - (cos_angle < -1) * 1 + cos_angle * (cos_angle <= 1) * (cos_angle >= -1)
+        angle = np.arccos(cos_angle)
+
+        Dist = (angle < np.pi/2) * np.linalg.norm(Vec_d_calc,axis=1) * abs(np.sin(angle)) + (angle >= np.pi/2) * np.min(np.array([D_a,D_b]),axis=0)
+
+
+        return Dist
+
+    N_points = len(Pos_transfo)
+
+    min_z = np.min(Pos_transfo[:,2])
+    pitch = np.max(Pos_transfo[:,2]) - np.min(Pos_transfo[:,2])
+    print(pitch,np.max(Pos_transfo[:,2]),np.min(Pos_transfo[:,2]))
+
+    N_z = int((pitch // slice_thickness)+1)
+
+    Pos_centered = Pos_transfo - np.mean(Pos_transfo,axis=0)
+    Pos_centered[:,2] = 0
+    Dist = np.sort(np.sum(Pos_centered**2,axis=1)**(1/2))
+    Dist = Dist[int(threshold_cut * N_points):int(1-threshold_cut * N_points)]
+    diameter = np.max(Dist)*2
+    thickness = np.max(Dist) - np.min(Dist)
+
+
+
+    a,b = np.polyfit(np.arange(len(Dist)),Dist,1)
+    diameter = (a*N_points+b) * 2
+    thickness = a*N_points
+
+    plt.plot(Dist,'o-r')
+    x = np.array([0,N_points])
+    plt.plot(x,a*x+b)
+    plt.show()
+    # plt.plot(Pos_transfo[:,0],Pos_transfo[:,1],"or")
+    # plt.show()
+
+    mean = np.mean(Pos_transfo,axis=0)
+    mean[2] = 0
+    Pos_transfo = Pos_transfo - mean
+    Means = []
+    M = []
+    # N_z=1
+    # z = Pos_transfo[:,2]/pitch * 2*np.pi
+
+    for slice_helix in range(N_z):
+        Pos_slice = Pos_transfo[(Pos_transfo[:,2] >= slice_helix*slice_thickness + min_z) * (Pos_transfo[:,2] < (slice_helix+1)*slice_thickness + min_z)]
+        radius = np.sum(Pos_slice[:,:2]**2,axis=1)**(1/2)
+        mean = np.mean(radius,axis=0)
+        # plt.plot(Pos_slice[:,0],Pos_slice[:,1],"or")
+        # plt.plot(mean[0],mean[1],"ob")
+        # plt.show()
+        M.append(mean)
+
+        Means.append(np.sum(mean**2)**(1/2))
+
+
+    print("DD",np.mean(Means),np.median(Means))
+    M = np.array(M)
+
+    # plt.plot(Pos_transfo[:,0],Pos_transfo[:,1],"or")
+    # plt.plot(Pos_slice[:,0],Pos_slice[:,1],"or")
+    # # plt.plot(M,[0]*len(M),"ob")
+    # plt.plot(M,[0]*len(M),"ob")
+    # plt.show()
+
+    D = np.mean(Means)
+    # print("DT",diameter,thickness)
+
+
+    x,y,z = transfo_inv(Pos_transfo,D,pitch)
+    Pos = np.array([x,y,z]).transpose()
+
+    center = np.mean(Pos_transfo,axis=0)
+
+    #Do translation to have whole slices using periodic conditions
+    Pos_under_z = (Pos[:,2] < min_z).reshape((N_points,1)) * np.array([1.,1.,1.]) * (Pos + np.array([0,0,pitch]))
+    Pos_over_z = (Pos[:,2] > (min_z+pitch)).reshape((N_points,1)) * np.array([1.,1.,1.]) * (Pos - np.array([0,0,pitch]))
+    Pos_middle_z = ((Pos[:,2] >= min_z) * (Pos[:,2] <= (min_z + pitch))).reshape((N_points,1)) * np.array([1.,1.,1.]) * (Pos)
+
+    Pos_transfo_under_z = (Pos[:,2] < min_z).reshape((N_points,1)) * np.array([1.,1.,1.]) * (Pos_transfo + np.array([0,0,pitch]))
+    Pos_transfo_over_z = (Pos[:,2] > (min_z+pitch)).reshape((N_points,1)) * np.array([1.,1.,1.]) * (Pos_transfo - np.array([0,0,pitch]))
+    Pos_transfo_middle_z = ((Pos[:,2] >= min_z) * (Pos[:,2] <= (min_z + pitch))).reshape((N_points,1)) * np.array([1.,1.,1.]) * (Pos_transfo)
+
+    Pos_transfo = Pos_transfo_under_z + Pos_transfo_middle_z + Pos_transfo_over_z
+    Pos = Pos_under_z + Pos_middle_z + Pos_over_z
+    x,y,z = Pos.transpose()
+
+
+
+
+
+    # plt.plot(np.sort(x),"-r")
+    # plt.plot(np.sort(y),"-b")
+    # plt.show()
+    W_int, W_ext = [],[]
+    T_int, T_ext = [],[]
+    W = []
+    Surf = []
+    Surf_tot = []
+    T = []
+
+    for slice_helix in range(N_z):
+    #
+    # def slide(value):
+    #     slice_helix = int(value)
+
+        Pos_slice = Pos_transfo[(Pos[:,2] >= slice_helix*slice_thickness + min_z) * (Pos[:,2] < (slice_helix+1)*slice_thickness + min_z)]
+        Diff_slice_mean = center - np.mean(Pos_slice,axis=0)
+        Pos_slice = Pos_slice - np.mean(Pos_slice,axis=0)
+
+        ## rotate to face the same direction
+        angle_z = np.arctan2(Diff_slice_mean[1],Diff_slice_mean[0])
+        Pos_slice = Pos_slice.dot(Rz(angle_z))
+
+        Num_S = len(Pos_slice)
+
+        ##get the surface to rotate to be on the xy plane
+        def plane_surf(X,a,b):
+            x,y = X.transpose()
+            return a*x + b*y
+
+        a,b = sp.optimize.curve_fit(plane_surf,Pos_slice[:,:2],Pos_slice[:,2])[0]
+
+        Vec_1 = np.array([1,0,plane_surf(np.array([1,0]),a,b)])
+        ar = pv.Arrow([0,0,0],Vec_1,scale=10)
+
+        Vec_2 = np.array([0,1,plane_surf(np.array([0,1]),a,b)])
+        ar = pv.Arrow([0,0,0],Vec_2,scale=10)
+        angle_y = np.arctan2(Vec_1[0],Vec_1[2])
+        Pos_slice = Pos_slice.dot(Ry(angle_y-np.pi/2))
+
+        angle_x = np.arctan2(Vec_2[2],Vec_2[1])
+        Pos_slice = Pos_slice.dot(Rx(angle_x))
+
+
+        angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0]) + np.pi
+        dist = np.linalg.norm(Pos_slice,axis=1)
+
+
+
+
+
+        def square_fit_T(Pos,l,L,phi):
+            Pos_corners = np.array([[-l/2, -L/2],[l/2,-L/2],[l/2,L/2],[-l/2,L/2]])
+            Pos_corners_rota = Pos_corners.dot(Rota(phi))
+            x1,y1,x2,y2,x3,y3,x4,y4 = Pos_corners_rota.ravel()
+
+            Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+            Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+            Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+            Dist_4 = calc_dist(Pos,x4,y4,x1,y1)
+
+            Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4])
+            Min_dists = np.min(Dists,axis=0)
+            return Min_dists
+
+
+        angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0])+np.pi
+        N_angles=64
+        d_angle = 2*np.pi/N_angles
+        mean_pos_angle=[]
+        angles_select_int = np.linspace(0,2*np.pi,N_angles,endpoint=False)
+        for angle in angles:
+            selection = (angles >= angle) * (angles < (angle + d_angle))
+            mean_pos_angle.append(np.mean(Pos_slice[selection],axis=0))
+        mean_pos_angle = np.array(mean_pos_angle)
+
+        x_min,x_max,y_min,y_max = np.min(Pos_slice[:,0]),np.max(Pos_slice[:,0]),np.min(Pos_slice[:,1]),np.max(Pos_slice[:,1])
+        l,L,phi = x_max-x_min,y_max-y_min,0
+        Bounds = np.array([[0,l],[0,L],[0,np.pi*2]]).transpose()
+
+        l,L,phi = sp.optimize.curve_fit(square_fit_T,mean_pos_angle[:,:2],[0]*len(Pos_slice),p0=(l,L,phi),bounds=Bounds)[0]
+
+
+        Pos_slice = Pos_slice.dot(Rz(-phi))
+
+
+        Pos_x = Pos_slice[:,0][int(Num_S*threshold_cut):int(Num_S*(1-threshold_cut))]
+        width = np.max(Pos_slice[:,1]) - np.min(Pos_slice[:,1])
+        W.append(width)
+        T.append(np.max(Pos_slice[:,0]) - np.min(Pos_slice[:,0]))
+
+
+
+
+
+
+
+
+
+        Pos_slice = Pos_slice[:,:2]
+
+
+
+        def points(Pos,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8):
+
+            Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+            Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+            Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+            Dist_4 = calc_dist(Pos,x4,y4,x5,y5)
+            Dist_5 = calc_dist(Pos,x5,y5,x6,y6)
+            Dist_6 = calc_dist(Pos,x6,y6,x7,y7)
+            Dist_7 = calc_dist(Pos,x7,y7,x8,y8)
+            Dist_8 = calc_dist(Pos,x8,y8,x1,y1)
+
+            Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4,Dist_5,Dist_6,Dist_7,Dist_8])
+            Min_dists = np.min(Dists,axis=0)
+            return Min_dists
+
+        def points_arg(Pos,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8):
+
+            Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+            Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+            Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+            Dist_4 = calc_dist(Pos,x4,y4,x5,y5)
+            Dist_5 = calc_dist(Pos,x5,y5,x6,y6)
+            Dist_6 = calc_dist(Pos,x6,y6,x7,y7)
+            Dist_7 = calc_dist(Pos,x7,y7,x8,y8)
+            Dist_8 = calc_dist(Pos,x8,y8,x1,y1)
+
+            Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4,Dist_5,Dist_6,Dist_7,Dist_8])
+            arg_dists = np.argmin(Dists,axis=0)
+            return arg_dists
+
+
+
+        if False:
+            x_min,x_max,y_min,y_max = np.min(Pos_slice[:,0]),np.max(Pos_slice[:,0]),np.min(Pos_slice[:,1]),np.max(Pos_slice[:,1])
+            d = 3
+            dx = (x_max - x_min)/d
+            dy = (y_max - y_min)/d
+            x1,y1,x2,y2 = x_min,y_min+dy, x_min+dx, y_min
+            x3,y3,x4,y4 = x_max-dx,y_min, x_max, y_min+dy
+            x5,y5,x6,y6 = x_max,y_max-dy, x_max-dx,y_max
+            x7,y7,x8,y8 = x_min+dx,y_max, x_min,y_max-dy
+            p0 = (x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8)
+            bounds_x_m = (x_min,0)
+            bounds_x_M = (0,x_max)
+
+            bounds_y_m = (y_min,0)
+            bounds_y_M = (0,y_max)
+
+            Bounds = np.array( [bounds_x_m,bounds_y_m,bounds_x_m,bounds_y_m,bounds_x_M,bounds_y_m,bounds_x_M,bounds_y_m,bounds_x_M,bounds_y_M,bounds_x_M,bounds_y_M,bounds_x_m,bounds_y_M,bounds_x_m,bounds_y_M]).transpose()
+
+
+            angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0]) + np.pi
+            N_angles=64
+            d_angle = 2*np.pi/N_angles
+            mean_pos_angle=[]
+            angles_select_int = np.linspace(0,2*np.pi,N_angles,endpoint=False)
+            for angle in angles:
+                selection = (angles >= angle) * (angles < (angle + d_angle))
+                mean_pos_angle.append(np.mean(Pos_slice[selection],axis=0))
+            mean_pos_angle = np.array(mean_pos_angle)
+
+
+
+            x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8 = sp.optimize.curve_fit(points,mean_pos_angle[:,:2],[0]*len(Pos_slice),p0=p0,bounds=Bounds)[0]
+
+            Vecs_ext = np.array([[x3-x4,y3-y4],[x5-x4,y5-y4],[x5-x6,y5-y6]])
+            Vecs_int = np.array([[x7-x8,y7-y8],[x8-x1,y8-y1],[x1-x2,y1-y2]])
+
+            arg_dists = points_arg(Pos_slice[:,:2],x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8)
+
+            ext_points = Pos_slice[((arg_dists == 3) + (arg_dists == 4) + (arg_dists == 5)).astype("bool")][:,:2]
+            dists_ext = points(ext_points,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8)
+            thickness_ext = np.sort(dists_ext)
+            thickness_ext = thickness_ext[:int((1-threshold_cut)*len(thickness_ext))][-1]
+
+            int_points = Pos_slice[((arg_dists == 1) + (arg_dists == 7) + (arg_dists == 8)).astype("bool")][:,:2]
+            dists_int = points(int_points,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8)
+            thickness_int = np.sort(dists_int)
+            thickness_int = thickness_int[:int((1-threshold_cut)*len(thickness_int))][-1]
+
+            # T_ext.append(thickness_ext*2)
+            # T_int.append(thickness_int*2)
+            # W_ext.append(np.sum(np.linalg.norm(Vecs_ext,axis=1)))
+            # W_int.append(np.sum(np.linalg.norm(Vecs_int,axis=1)))
+
+
+            # print("t_ext",thickness_ext*2)
+            # print("t_int",thickness_int*2)
+            # print("w_ext",np.sum(np.linalg.norm(Vecs_ext,axis=1)))
+            # print("w_int",np.sum(np.linalg.norm(Vecs_int,axis=1)))
+
+        # plt.plot(Pos_slice[:,0],Pos_slice[:,1],"or")
+        # plt.show()
+        # c=d
+            # print(np.array([x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8]))
+
+        N_y = 20
+        if True:
+
+            y_int = np.linspace(y_min,y_max,N_y,endpoint=False)
+            dy = y_int[1] - y_int[0]
+            L_T_int = []
+            for y in y_int:
+                Pos_extr = Pos_slice[(Pos_slice[:,0] > 0) * (Pos_slice[:,1] >= y) * (Pos_slice[:,1] <= (y + dy))]
+                L_T_int.append( np.max(Pos_extr[:,0]) - np.min(Pos_extr[:,0]))
+            T_int.append(np.median(L_T_int))
+
+
+
+            y_ext = np.linspace(y_min,y_max,N_y,endpoint=False)
+            dy = y_ext[1] - y_ext[0]
+            L_T_ext = []
+            for y in y_ext:
+                Pos_extr = Pos_slice[(Pos_slice[:,0] < 0) * (Pos_slice[:,1] >= y) * (Pos_slice[:,1] <= (y + dy))]
+                L_T_ext.append( np.max(Pos_extr[:,0]) - np.min(Pos_extr[:,0]))
+            T_ext.append(np.median(L_T_ext))
+
+
+        ##FUNC IMG
+        if False:
+            # Pos_slice = Pos[(Pos[:,2] >= slice_helix*slice_thickness + min_z) * (Pos[:,2] < (slice_helix+1)*slice_thickness + min_z)]
+            # mean_slice = np.mean(Pos_slice,axis=0)
+            # Pos_slice = (Pos_slice - mean_slice).dot(Rz(-angle_x))
+            Pos_slice = Pos_transfo[(Pos[:,2] >= slice_helix*slice_thickness + min_z) * (Pos[:,2] < (slice_helix+1)*slice_thickness + min_z)]
+
+            Diff_slice_mean = center - np.mean(Pos_slice,axis=0)
+            Pos_slice = Pos_slice - np.mean(Pos_slice,axis=0)
+
+            angle_z = np.arctan2(Diff_slice_mean[1],Diff_slice_mean[0])
+
+            Pos_slice = Pos_slice.dot(Rz(angle_z))
+
+            mean_slice = np.mean(Pos_slice,axis=0)
+            Num_S = len(Pos_slice)
+            Pos_slice = Pos_slice - mean_slice
+
+
+            def plane_surf(X,a,b):
+                x,y = X.transpose()
+                return a*x + b*y
+
+            a,b = sp.optimize.curve_fit(plane_surf,Pos_slice[:,:2],Pos_slice[:,2])[0]
+
+            Vec_1 = np.array([1,0,plane_surf(np.array([1,0]),a,b)])
+            Vec_2 = np.array([0,1,plane_surf(np.array([0,1]),a,b)])
+
+            if False:
+                ar = pv.Arrow([0,0,0],Vec_1,scale=10)
+                plotter.add_mesh(ar,name="ar1",color="red")
+                ar = pv.Arrow([0,0,0],Vec_2,scale=10)
+                plotter.add_mesh(ar,name="ar2",color="blue")
+            if True:
+                ar = pv.Arrow([0,0,0],[1,0,0],scale=10)
+                plotter.add_mesh(ar,name="ar3",color="Black")
+                ar = pv.Arrow([0,0,0],[0,1,0],scale=10)
+                plotter.add_mesh(ar,name="ar4",color="Black")
+                ar = pv.Arrow([0,0,0],[0,0,1],scale=10)
+                plotter.add_mesh(ar,name="ar5",color="Black")
+
+            angle_y = np.arctan2(Vec_1[0],Vec_1[2])
+            Pos_slice = Pos_slice.dot(Ry(angle_y-np.pi/2))
+
+            angle_x = np.arctan2(Vec_2[2],Vec_2[1])
+            Pos_slice = Pos_slice.dot(Rx(angle_x))
+
+
+            # angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0]) + np.pi
+            # dist = np.linalg.norm(Pos_slice,axis=1)
+            #
+            # def coss(x,a,phi,b,w):
+            #     return -a*np.cos(w*x+phi) + b
+            # a, phi, b, w = (np.max(dist)-np.min(dist)) /2, 0, np.mean(dist), 2
+            # a, phi, b, w = sp.optimize.curve_fit(coss,angles,dist,p0=(a,phi,b,w))[0]
+            # # Pos_slice = Pos_slice.dot(Rz(-phi+np.pi/2))
+            # print("PHI",phi)
+            # x = np.linspace(0,2*np.pi,100)
+            # plt.plot(x,coss(x,a,phi,b,w),"o-r")
+            # print("PHI_av",phi)
+            #
+            # angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0]) + np.pi
+            # dist = np.linalg.norm(Pos_slice,axis=1)
+            # a, phi, b, w = (np.max(dist)-np.min(dist)) /2, 0, np.mean(dist), 2
+            # a, phi, b, w = sp.optimize.curve_fit(coss,angles,dist,p0=(a,phi,b,w))[0]
+            # print("PHI_ap",phi)
+            # plt.plot(x,coss(x,a,phi,b,w),"o-b")
+            # plt.show()
+
+            def points(Pos,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8):
+                X,Y = Pos.transpose()
+
+
+                Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+                Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+                Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+                Dist_4 = calc_dist(Pos,x4,y4,x5,y5)
+                Dist_5 = calc_dist(Pos,x5,y5,x6,y6)
+                Dist_6 = calc_dist(Pos,x6,y6,x7,y7)
+                Dist_7 = calc_dist(Pos,x7,y7,x8,y8)
+                Dist_8 = calc_dist(Pos,x8,y8,x1,y1)
+
+                Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4,Dist_5,Dist_6,Dist_7,Dist_8])
+                Min_dists = np.min(Dists,axis=0)
+                return Min_dists
+
+            def square_fit(Pos,x1,y1,x2,y2,x3,y3,x4,y4):
+
+                Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+                Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+                Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+                Dist_4 = calc_dist(Pos,x4,y4,x1,y1)
+
+                Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4])
+                Min_dists = np.min(Dists,axis=0)
+                return Min_dists
+
+
+
+
+            def square_fit_T(Pos,l,L,phi):
+                Pos_corners = np.array([[-l/2, -L/2],[l/2,-L/2],[l/2,L/2],[-l/2,L/2]])
+                Pos_corners_rota = Pos_corners.dot(Rota(phi))
+                x1,y1,x2,y2,x3,y3,x4,y4 = Pos_corners_rota.ravel()
+
+                Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+                Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+                Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+                Dist_4 = calc_dist(Pos,x4,y4,x1,y1)
+
+                Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4])
+                Min_dists = np.min(Dists,axis=0)
+                return Min_dists
+
+
+            angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0])+np.pi
+            N_angles=64
+            d_angle = 2*np.pi/N_angles
+            mean_pos_angle=[]
+            angles_select_int = np.linspace(0,2*np.pi,N_angles,endpoint=False)
+            for angle in angles:
+                selection = (angles >= angle) * (angles < (angle + d_angle))
+                mean_pos_angle.append(np.mean(Pos_slice[selection],axis=0))
+            mean_pos_angle = np.array(mean_pos_angle)
+
+            x_min,x_max,y_min,y_max = np.min(Pos_slice[:,0]),np.max(Pos_slice[:,0]),np.min(Pos_slice[:,1]),np.max(Pos_slice[:,1])
+            l,L,phi = x_max-x_min,y_max-y_min,0
+            Bounds = np.array([[0,l],[0,L],[0,np.pi*2]]).transpose()
+            print(l,L,phi)
+            l,L,phi = sp.optimize.curve_fit(square_fit_T,mean_pos_angle[:,:2],[0]*len(Pos_slice),p0=(l,L,phi),bounds=Bounds)[0]
+            print(l,L,phi)
+
+            Pos_slice = Pos_slice.dot(Rz(-phi))
+
+
+            if False:
+                x_min,x_max,y_min,y_max = np.min(Pos_slice[:,0]),np.max(Pos_slice[:,0]),np.min(Pos_slice[:,1]),np.max(Pos_slice[:,1])
+                d = 3
+                dx = (x_max - x_min)/d
+                dy = (y_max - y_min)/d
+                x1,y1,x2,y2 = x_min,y_min+dy, x_min+dx, y_min
+                x3,y3,x4,y4 = x_max-dx,y_min, x_max, y_min+dy
+                x5,y5,x6,y6 = x_max,y_max-dy, x_max-dx,y_max
+                x7,y7,x8,y8 = x_min+dx,y_max, x_min,y_max-dy
+                p0 = (x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8)
+                bounds_x_m = (x_min,0)
+                bounds_x_M = (0,x_max)
+
+                bounds_y_m = (y_min,0)
+                bounds_y_M = (0,y_max)
+
+                Bounds = np.array( [bounds_x_m,bounds_y_m,bounds_x_m,bounds_y_m,bounds_x_M,bounds_y_m,bounds_x_M,bounds_y_m,bounds_x_M,bounds_y_M,bounds_x_M,bounds_y_M,bounds_x_m,bounds_y_M,bounds_x_m,bounds_y_M]).transpose()
+
+
+                angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0]) + np.pi
+                N_angles=64
+                d_angle = 2*np.pi/N_angles
+                mean_pos_angle=[]
+                angles_select_int = np.linspace(0,2*np.pi,N_angles,endpoint=False)
+                for angle in angles:
+                    selection = (angles >= angle) * (angles < (angle + d_angle))
+                    mean_pos_angle.append(np.mean(Pos_slice[selection],axis=0))
+                mean_pos_angle = np.array(mean_pos_angle)
+
+
+
+                x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8 = sp.optimize.curve_fit(points,mean_pos_angle[:,:2],[0]*len(Pos_slice),p0=p0,bounds=Bounds)[0]
+
+
+                # print(np.array([x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8]))
+
+            if False:
+                angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0]) + np.pi
+                dist = np.linalg.norm(Pos_slice,axis=1)
+
+                def coss(x,a,phi,b,w):
+                    return a*np.cos(w*x+phi) + b
+                a, phi, b, w = (np.max(dist)-np.min(dist)) /2, angles[np.argmax(dist)], np.mean(dist), 2
+                print(a,phi,b,w)
+                a,phi,b,w = sp.optimize.curve_fit(coss,angles,dist,p0=(a,phi,b,w))[0]
+                # a,phi,b,w = sp.optimize.curve_fit(coss,angle,dist)[0]
+                print(a, phi, b, w)
+                if a < 0: a, phi = -a, phi + np.pi
+
+                x=np.linspace(0,2*np.pi,100)
+                plt.plot(x,coss(x,a,phi,b,w),"-b")
+                plt.plot(angles,dist,"or")
+
+                angle_max_1 = (-phi/w) % (2*np.pi)
+                angle_max_2 = ((-phi+2*np.pi)/w)% (2*np.pi)
+
+                angle_max_1, angle_max_2 = max(angle_max_1, angle_max_2), min(angle_max_1, angle_max_2)
+
+                plt.vlines(angle_max_1,b-a,a+b,"g")
+                plt.vlines(angle_max_2,b-a,a+b,"b")
+
+                select_int = (angles<angle_max_1) * (angles>angle_max_2)
+                int_slice = Pos_slice[select_int]
+                ext_slice = Pos_slice[(1-select_int).astype("bool")]
+
+                N_angles = 16
+                angles_int = angles[select_int]
+                min_angle_int, max_angle_int = np.min(angles_int),np.max(angles_int)
+
+
+                d_angle = (max_angle_int - min_angle_int)/N_angles
+                angles_select_int = np.linspace(min_angle_int,max_angle_int,N_angles,endpoint=False)
+
+                thickness_int = []
+                mean_pos_angle_int = []
+                for angle in angles_select_int:
+                    selection = (angles[select_int] >= angle) * (angles[select_int] < (angle + d_angle))
+
+                    int_slice_angle = int_slice[selection]
+                    mean_pos_angle_int.append(np.mean(int_slice_angle,axis=0))
+                    print(np.sum(selection))
+                    thickness_int.append([])
+
+                plt.plot(angles_select_int,coss(angles_select_int,a,phi,b,w),"oy")
+                plt.show()
+
+            if False:
+                x_min,x_max,y_min,y_max = np.min(Pos_slice[:,0]),np.max(Pos_slice[:,0]),np.min(Pos_slice[:,1]),np.max(Pos_slice[:,1])
+
+                x1,y1,x2,y2,x3,y3,x4,y4 = x_min,y_min, x_max, y_min, x_max,y_max,x_min,y_max
+
+                p0 = (x1,y1,x2,y2,x3,y3,x4,y4)
+                bounds_x_m = (x_min,0)
+                bounds_x_M = (0,x_max)
+
+                bounds_y_m = (y_min,0)
+                bounds_y_M = (0,y_max)
+
+                Bounds = np.array( [bounds_x_m,bounds_y_m,bounds_x_M,bounds_y_m,bounds_x_M,bounds_y_M,bounds_x_m,bounds_y_M]).transpose()
+                angles = np.arctan2(Pos_slice[:,1],Pos_slice[:,0]) + np.pi
+                N_angles=64
+                d_angle = 2*np.pi/N_angles
+
+                mean_pos_angle=[]
+                angles_select_int = np.linspace(0,2*np.pi,N_angles,endpoint=False)
+                for angle in angles:
+                    selection = (angles >= angle) * (angles < (angle + d_angle))
+                    mean_pos_angle.append(np.mean(Pos_slice[selection],axis=0))
+                mean_pos_angle = np.array(mean_pos_angle)
+                # x1,y1,x2,y2,x3,y3,x4,y4 = sp.optimize.curve_fit(square_fit,mean_pos_angle[:,:2],[0]*len(Pos_slice),p0=p0,bounds=Bounds)[0]
+
+                N_y = 20
+
+                # y_int = np.linspace(y_min,y_max,N_y,endpoint=False)
+                y_int = np.linspace(y_min,y_max,N_y,endpoint=False)
+                dy = y_int[1] - y_int[0]
+                L_T_int = []
+                for y in y_int:
+                    Pos_extr = Pos_slice[(Pos_slice[:,0] > 0) * (Pos_slice[:,1] >= y) * (Pos_slice[:,1] <= (y + dy))]
+                    L_T_int.append( np.max(Pos_extr[:,0]) - np.min(Pos_extr[:,0]))
+                T_int.append(np.median(L_T_int))
+
+
+                # y_ext = np.linspace(y1,y4,N_y,endpoint=False)
+                y_ext = np.linspace(y_min,y_max,N_y,endpoint=False)
+                dy = y_ext[1] - y_ext[0]
+                L_T_ext = []
+                for y in y_ext:
+                    Pos_extr = Pos_slice[(Pos_slice[:,0] < 0) * (Pos_slice[:,1] >= y) * (Pos_slice[:,1] <= (y + dy))]
+                    L_T_ext.append( np.max(Pos_extr[:,0]) - np.min(Pos_extr[:,0]))
+                T_ext.append(np.median(L_T_ext))
+
+
+
+
+
+
+
+
+
+
+
+            if False:
+
+                # print(x1,y1,x2,y2,x3,y3,x4,y4)
+
+                tube = pv.Tube(pointa = [x1,y1,0], pointb = [x2,y2,0])
+                plotter.add_mesh(tube,name="ta")
+                tube = pv.Tube(pointa = [x2,y2,0], pointb = [x3,y3,0])
+                plotter.add_mesh(tube,name="tb")
+                tube = pv.Tube(pointa = [x3,y3,0], pointb = [x4,y4,0])
+                plotter.add_mesh(tube,name="tc")
+                tube = pv.Tube(pointa = [x4,y4,0], pointb = [x5,y5,0])
+                plotter.add_mesh(tube,name="td")
+                tube = pv.Tube(pointa = [x5,y5,0], pointb = [x6,y6,0])
+                plotter.add_mesh(tube,name="te")
+                tube = pv.Tube(pointa = [x6,y6,0], pointb = [x7,y7,0])
+                plotter.add_mesh(tube,name="tf")
+                tube = pv.Tube(pointa = [x7,y7,0], pointb = [x8,y8,0])
+                plotter.add_mesh(tube,name="tg")
+                tube = pv.Tube(pointa = [x8,y8,0], pointb = [x1,y1,0])
+                plotter.add_mesh(tube,name="th")
+
+
+            if False:
+                Pos_corners = np.array([[-l/2, -L/2],[l/2,-L/2],[l/2,L/2],[-l/2,L/2]])
+                Pos_corners_rota = Pos_corners.dot(Rota(phi))
+                x1,y1,x2,y2,x3,y3,x4,y4 = Pos_corners_rota.ravel()
+                # print(x1,y1,x2,y2,x3,y3,x4,y4)
+
+                tube = pv.Tube(pointa = [x1,y1,0], pointb = [x2,y2,0])
+                plotter.add_mesh(tube,name="ta")
+                tube = pv.Tube(pointa = [x2,y2,0], pointb = [x3,y3,0])
+                plotter.add_mesh(tube,name="tb")
+                tube = pv.Tube(pointa = [x3,y3,0], pointb = [x4,y4,0])
+                plotter.add_mesh(tube,name="tc")
+                tube = pv.Tube(pointa = [x4,y4,0], pointb = [x1,y1,0])
+                plotter.add_mesh(tube,name="td")
+
+
+
+
+
+            Types_slice = Types[(Pos[:,2] >= slice_helix*slice_thickness + min_z) * (Pos[:,2] < (slice_helix+1)*slice_thickness + min_z)]
+            # Pos_slice = Pos[:]
+            # Types_slice = Types[:]
+
+            # Pos_slice = Pos_transfo[:]
+            # Types_slice = Types[:]
+
+            # Pos_slice = np.append(Pos_slice,[[0]]*len(Pos_slice),axis=1)
+
+            # x,y,z = transfo_inv(Pos_slice,diameter_avg,pitch,thickness)
+            # print(diameter_avg,pitch,thickness)
+            # print(np.shape(Pos_slice))
+            # Pos_slice = np.array([x,y,z]).transpose()
+            # print(np.shape(Pos_slice))
+
+            sph = pv.Sphere(radius=0.2)
+            if True:
+                sph = pv.Sphere(radius=1.0)
+                data = pv.PolyData(mean_pos_angle)
+                pc = data.glyph(scale=False,geom=sph,orient=False)
+                plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color="blue",name="aa")
+            if False:
+                bis = np.append(bisector_points,[[0]]*len(bisector_points),axis=1)
+                data = pv.PolyData(bis)
+                pc = data.glyph(scale=False,geom=sph,orient=False)
+                plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color="green",name="bis")
+
+            if False:
+                for a,b in zip(perpendicular_dir_coef,perpendicular_affin):
+                    x = np.linspace(-90,120,10)
+                    y = a*x+b
+                    z = np.array([0]*len(x))
+                    X,Y,Z = np.meshgrid(x,y,z)
+                    data =pv.StructuredGrid(x,y,z)
+                    plotter.add_mesh(data,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color="red")
+
+            if False:
+                sph = pv.Sphere(radius=0.6)
+                data = pv.PolyData(int_slice)
+                pc = data.glyph(scale=False,geom=sph,orient=False)
+                plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color="gray",name="si")
+
+                sph = pv.Sphere(radius=0.4)
+                data = pv.PolyData(ext_slice)
+                pc = data.glyph(scale=False,geom=sph,orient=False)
+                plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color="red",name="o")
+
+            else:
+
+
+                # plotter=pv.Plotter()
+                # plotter.show_axes()
+                sph = pv.Sphere(radius=0.6)
+                data = pv.PolyData(Pos_slice[Types_slice==1])
+                pc = data.glyph(scale=False,geom=sph,orient=False)
+                plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color="gray",name="si")
+
+                sph = pv.Sphere(radius=0.4)
+                data = pv.PolyData(Pos_slice[(Types_slice==2) + (Types_slice==3)])
+                pc = data.glyph(scale=False,geom=sph,orient=False)
+                plotter.add_mesh(pc,opacity=0.5,pbr=True,roughness=.5,metallic=.2,color="red",name="o")
+
+
+            if True:
+                sph = pv.Sphere(radius=1.2)
+                centers = pv.PolyData([[0.,0,0]])
+                pc = centers.glyph(scale=False,geom=sph,orient=False)
+                plotter.add_mesh(pc,opacity=1.0,pbr=True,roughness=.5,metallic=.2,color="black",name="center")
+
+
+            # plotter.show()
+
+            # N_Si,N_O = np.shape(Bonds)
+            # Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
+            #
+            # Pos_Si = Pos_cutted[Types_cutted==1]
+            # Pos_O = Pos_cutted[((Types_cutted==2) + (Types_cutted==3)).astype("bool")]
+            #
+            # Indices = Indices[Bonds.ravel()!=0]
+            # tubes = pv.MultiBlock()
+            # for i_si,i_o in Indices:
+            #     t = pv.Tube(Pos_Si[i_si],Pos_O[i_o],n_sides=5,radius=0.2)
+            #     tubes.append(t)
+            #
+            # mesh = tubes.combine()
+            # plotter.add_mesh(mesh,opacity=0.1,pbr=True,roughness=.5,metallic=.2,color="blue",name="Bonds")
+
+    if show:
+        plotter = pv.Plotter()
+        plotter.show_axes()
+        plotter.add_slider_widget(slide, [0,N_z-1],value=N_z/2,title="Pos", fmt="%3.3e")
+        plotter.show()
+
+    print("W",np.median(W))
+    # print("W_int",np.mean(W_int))
+    # print("W_ext",np.mean(W_ext))
+    print("T_int",np.median(T_int))
+    print("T_ext",np.median(T_ext))
+    print("T",np.median(T))
+    print("pitch",pitch)
+    print("thickness",thickness)
+    print("D",2*D+np.median(T))
+    print("diameter",diameter)
+
+
+
+
+
+
+
+if __name__=="__main__":
+    #
+    file = "quartz_dupl.data"
+    list_BOX,list_ATOMS = read_data(file,do_scale=False)
 
 
     # file = "demo/dump_last_oh.lammpstrj"
     # file = "demo/dummp_trimmed.lammpstrj"
     # file = "demo/dummps_snad_last.lammpstrj"
     # file = "demo/dummp_700_last.lammpstrj"
+    # file = "dummp_870_last.lammpstrj"
     # file = "demo/dummp_twisted_long.lammpstrj"
+    # file = "demo/dummp_144_last.lammpstrj"
     # file = "demo/dummps_snad_last.lammpstrj"
     # file = "demo/dummps_round_2_last.lammpstrj"
-    file = "demo/dummps_round_3_last.lammpstrj"
+    # file = "demo/dummps_round_3_last.lammpstrj"
+    # file = "dummp_144_last.lammpstrj" #Large 60ps
+    # file = "dummp_145_last.lammpstrj" #Large 200ps
+    # file = "dummp_156_last.lammpstrj" #New 60ps
+    # file = "dummp_157_last.lammpstrj" #New 200ps
+    # file = "dummp_258_last.lammpstrj" #no transf
+    # file = "demo/dummp_5K.lammpstrj"
+    # file = "demo/dummp_3K.lammpstrj"
+    # file = "demo/dummps_round_new.lammpstrj"
     # file = "demo/dummps_long_last.lammpstrj"
     # file = "demo/dummp_trimmed_long_0K.lammpstrj"
     # file = "demo/dummp_trimmed_0K_last.lammpstrj"
-    list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
+    # list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
 
 
     list_TSTEP=[0]
@@ -1225,7 +2180,9 @@ if __name__=="__main__":
     # plot_syst(Pos,Types,Lims=list_BOX[-1])
 
     # analyze_plot_syst(Pos,Types,periodic=True,Lims=list_BOX[-1])
-    # analyze_mult(list_TSTEP,list_Pos,list_Types,periodic=False,Lims=list_BOX[-1],save=False)
+    # analyze_mult(list_TSTEP,list_Pos,list_Types,periodic=False,Lims=list_BOX[-1],save=False,density=False)
     # curvature_analysis(Pos)
-    analyze_defects(Pos,Types,periodic=True,Lims=list_BOX[-1])
+    # save_defects("defects.xyz",Pos,Types,periodic=True,Lims=list_BOX[-1])
+    # analyze_defects(Pos,Types,periodic=True,Lims=list_BOX[-1])
     # analyze_density(Pos)
+    evaluate_dimenions(Pos,Types,slice_thickness=8,show=False,threshold_cut=0.001)

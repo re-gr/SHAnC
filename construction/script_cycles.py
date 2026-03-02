@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-from create_distorted import *
 import pyvista as pv
 import scipy.spatial.distance as sd
 import scipy.sparse.csgraph as sps
@@ -267,9 +266,14 @@ def count_cycles_test(Pos,Types,cube=14,threshold_Si=2,periodic=True,Lims=None):
     return Cycles, L_cycles
 
 def plot_cycles(L_cycles,cube=0,s=3.5):
-    fig,ax = plt.subplots()
+    # fig,ax = plt.subplots()
+    fig,ax = plt.subplots(figsize=(8,6),dpi=200)
+    plt.rcParams.update({'font.size': 15})
+    plt.rcParams['svg.fonttype'] = 'none'
     max_graph = np.max(L_cycles) + 1
     maxx = max_graph
+
+
     #Max cycle corresponding to length, length is divided by 2 hence the following formula
     if cube != 0:
         max_cycle = np.pi / (np.arcsin(s/cube))
@@ -277,13 +281,21 @@ def plot_cycles(L_cycles,cube=0,s=3.5):
         maxx = max(max_graph,max_cycle)
         plt.axvline(max_cycle,linestyle="dashed",color="blue",linewidth=3,label="Precision Limit")
 
+    purple = np.array([96,25,255])/255
+    dark_purple = np.array([56,20,180])/255
+    dark_dark_purple = np.array([34,10,120])/255
 
-    plt.hist(L_cycles,bins=maxx-1,range=(1,maxx),color="orange",edgecolor="red",linewidth=1)
+
+
+    plt.hist(L_cycles,bins=maxx-1,range=(1,maxx),color=purple,edgecolor=dark_purple,linewidth=1)
     plt.xticks([k+1/2 for k in range(1,maxx)],[k for k in range(1,maxx)])
-    plt.legend()
-    plt.ylabel("Number of cycles")
-    plt.xlabel("Length of cycles")
-    plt.show()
+    # plt.legend()
+    plt.xticks(color=purple)
+    plt.yticks(color=purple)
+    plt.ylabel("Number of cycles",color=dark_purple)
+    plt.xlabel("Length of cycles",color=dark_purple)
+    # plt.show()
+    plt.savefig("Cycles.png")
 
 
 def clean_cycles_basis(Cycles):
@@ -945,6 +957,247 @@ def xor_clean_rm(Cycle_Basis,k,k_long,long=12):
 
     return Cycles_clean
 
+def xor_rm(Cycles):
+    import time
+    # def convert_back(cycle,max_ind):
+    #     cycle_pairs = []
+    #     for ind in cycle:
+    #         ind_m = ind%max_ind
+    #         ind_M = ind//max_ind
+    #         cycle_pairs.append([ind_M,ind_m])
+    #     return cycle_pairs
+    a=time.time()
+
+    Cycles_S = [True for k in range(len(Cycles))]
+
+    Cycle_lin = [ind for cycle in Cycles for ind in cycle]
+    max_ind = np.max(Cycle_lin)+1
+
+    #Convert to edges
+    Edges_set = []
+    for cycle in Cycles:
+        cycle_r = np.roll(cycle,1)
+        cycle_add = []
+        for ind,ind_r in zip(cycle,cycle_r):
+            ind_M, ind_m = max(ind,ind_r),min(ind,ind_r)
+            cycle_add.append(ind_m*max_ind + ind_M)
+        Edges_set.append(set(cycle_add))
+
+    A = 0
+    B = 0
+    for cycle_set,ind_cycle_set in zip(Edges_set,range(len(Edges_set))):
+
+        Edges_set_red = []
+        Edges_set_red_ind = []
+        for edge_set,edge_set_ind in zip(Edges_set,range(len(Edges_set))):
+            #Get cycles that have at least one edge in common
+            if len(cycle_set.intersection(edge_set)):
+                Edges_set_red.append(edge_set)
+                Edges_set_red_ind.append(edge_set_ind)
+
+        for cycle_set_2,ind_cycle_set_red_2 in zip(Edges_set_red,range(len(Edges_set_red))):
+            ind_cycle_set_2 = Edges_set_red_ind[ind_cycle_set_red_2]
+
+            if Cycles_S[ind_cycle_set] and Cycles_S[ind_cycle_set_2]:
+                new_cycle = cycle_set.symmetric_difference(cycle_set_2)
+
+                if new_cycle in Edges_set_red:
+                # if new_cycle in Edges_set:
+                    # a = convert_back(cycle_set,max_ind)
+                    # b = convert_back(cycle_set_2,max_ind)
+                    # c = convert_back(new_cycle,max_ind)
+                    # if 39 in np.array(a).flatten() or 39 in np.array(b).flatten() or 39 in np.array(c).flatten():
+                    #     print("##############")
+                    #     print(len(a),a)
+                    #     print(len(b),b)
+                    #     print(len(c),c)
+                    #     print(len(cycle_set) >= len(cycle_set_2) and len(cycle_set) >= len(new_cycle),len(cycle_set_2) >= len(new_cycle))
+                    #     print(ind_cycle_set)
+                    #     print(ind_cycle_set_2)
+                    #     print(Edges_set.index(new_cycle))
+                    #     print(Cycles_S[2])
+                    #     print("##############")
+
+                    if len(cycle_set) >= len(cycle_set_2) and len(cycle_set) >= len(new_cycle): Cycles_S[ind_cycle_set] = False
+                    elif len(cycle_set_2) >= len(new_cycle): Cycles_S[ind_cycle_set_2] = False
+                    else: Cycles_S[Edges_set.index(new_cycle)] = False
+
+    Cycles_return = []
+    print(np.sum(Cycles_S),len(Cycles_S),Cycles_S[:5])
+    for cycle,is_kept in zip(Cycles,Cycles_S):
+        if is_kept: Cycles_return.append(cycle)
+    return Cycles_return
+
+
+
+
+def find_cycles(Bonds):
+    G = nx.from_numpy_array(Bonds)
+    import time
+    a=time.time()
+    Cycles = []
+    Cycles_set = []
+    L_cycles = []
+
+    A = 0
+    B = 0
+    C = 0
+
+    for node in G.nodes:
+        neighbors = list(nx.neighbors(G,node))
+        for n1 in neighbors:
+            for n2 in neighbors:
+                if n1!=n2:
+                    G.remove_edges_from([(node,n1),(node,n2)])
+                    try:
+                        APSP = nx.bidirectional_shortest_path(G,n1,n2)
+                        # APSP = nx.shortest_path(G,n1,n2)
+                        cycle = [node] + APSP
+                        cycle_set = set(cycle)
+                        if not cycle_set in Cycles_set:
+                            Cycles.append(cycle)
+                            Cycles_set.append(cycle_set)
+                            L_cycles.append(len(cycle))
+                    except: pass
+                    G.add_edges_from([(node,n1),(node,n2)])
+
+    print(time.time()-a)
+    return Cycles,L_cycles
+
+
+def visualize_cycles(Pos,Types,Cycles):
+    a=time.time()
+    Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
+    print(time.time()-a)
+
+    colors = ["","","","green","red","pink","blue","purple","black","orange","magenta"]
+    colors = colors+colors[3:]+colors[3:]+colors[3:]+colors[3:]+colors[3:]+colors[3:]+colors[3:]
+    plotter = pv.Plotter()
+
+    Pos_Si = Pos[Types==1]
+    def slide(value):
+        value = int(round(value))
+        L_poly = []
+        a=0
+        A = []
+        # for cycle in Cycles:
+        #     # if 255 in cycle:
+        #     #     a+=1
+        #     #     print(a)
+        #     #     A = A + cycle
+        #     #     print(set(A))
+        #
+        #     if len(cycle)== value:
+        #
+        #         Pos_cycle = Pos_Si[cycle]
+        #         Pos_cycle = np.append(Pos_cycle,[Pos_cycle[0]],axis=0)
+        #
+        #         x,y,z = Pos_cycle.transpose()
+        #         pv_poly = pv.StructuredGrid(x,y,z)
+        #         L_poly.append(pv_poly)
+        # pv_poly = L_poly[0].merge(L_poly[1:])
+        # plotter.add_mesh(pv_poly,color=colors[value],line_width=5,name="cycles")
+        for value in range(3,np.max(L_cycles)):
+            L_poly = []
+            for cycle in Cycles:
+                if np.random.random()<0.2:
+                    if len(cycle)== value:
+
+                        Pos_cycle = Pos_Si[cycle]
+                        Pos_cycle = np.append(Pos_cycle,[Pos_cycle[0]],axis=0)
+
+                        x,y,z = Pos_cycle.transpose()
+                        pv_poly = pv.StructuredGrid(x,y,z)
+                        L_poly.append(pv_poly)
+            if len(L_poly) > 2:
+                pv_poly = L_poly[0].merge(L_poly[1:])
+                plotter.add_mesh(pv_poly,color=colors[value],line_width=8,name="cycles"+str(value))
+                # plotter.add_mesh(pv_poly,color=colors[value],line_width=2,name="cycles"+str(value))
+
+
+
+    # print("A")
+    a = time.time()
+    N_Si = len(Pos_Si)
+    Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_Si).reshape((1,N_Si,1))*np.array([0,1])).reshape((N_Si*N_Si,2))
+    Indices = Indices[Bonds.ravel()!=0]
+    print(time.time()-a)
+
+    # plotter.add_point_labels(Pos_Si,np.arange(len(Pos_Si)),always_visible=True)
+
+
+    # poly = [pv.PolyData(np.array([Pos_Si[i_si_1],Pos_Si[i_si_2]])) for i_si_1,i_si_2 in Indices]
+    # mesh = poly[0].merge(poly[1:])
+    # plotter.add_mesh(mesh,opacity=0.1,color="gray")
+    # print("B")
+
+    b = time.time()
+    tubes = [pv.Tube(Pos_Si[i_si_1],Pos_Si[i_si_2],n_sides=5,radius=0.2) for i_si_1,i_si_2 in Indices]
+    print(time.time()-b)
+    b = time.time()
+    mesh = tubes[0].merge(tubes[1:])
+    print(time.time()-b)
+    b = time.time()
+    plotter.add_mesh(mesh,opacity=0.05)
+    print(time.time()-b)
+    L_cycles = [len(cycle) for cycle in Cycles]
+
+    plotter.add_slider_widget(slide, [3,np.max(L_cycles)],value=3,title="Length Cycles", fmt="%3.0f")
+    plotter.show()
+
+
+def save_cycles(Pos,Types,Cycles,file="cycles.txt"):
+    L_cycles = [len(cycle) for cycle in Cycles]
+    Pos_Si = Pos[Types==1]
+
+    max_cycle = np.max(L_cycles)
+
+    with open(file,'w') as file:
+        file.write("# File containing the cycles computed using SHAnC\n")
+        file.write("# The format is length of cycle, ids, positions (x,y,z)\n")
+        for j in range(3,max_cycle+1):
+            file.write("#cycles of {}\n".format(j))
+            for cycle in Cycles:
+                if len(cycle) == j:
+                    file.write("{}".format(j))
+                    for index in cycle:
+                        file.write(" {}".format(index))
+
+                    for index in cycle:
+                        pos_cycle = Pos_Si[index]
+                        file.write(" {:3.3f} {:3.3f} {:3.3f}".format(pos_cycle[0],pos_cycle[1],pos_cycle[2]))
+                    file.write("\n")
+    return
+
+
+
+def read_cycles(file="cycles.txt"):
+    Cycles = []
+    L_cycles = []
+    Pos_cycles = []
+
+    for line in open(file,"r"):
+        if "#" in line: pass
+        else:
+            lsplit = line.split()
+            length = int(lsplit[0])
+            ids_str = lsplit[1:length+1]
+            ids = []
+            for id_str in ids_str: ids.append(int(id_str))
+
+            positions_str = lsplit[length+1:]
+            positions = []
+            for pos_str in positions_str: positions.append(float(pos_str))
+            pos_x = positions[0::3]
+            pos_y = positions[1::3]
+            pos_z = positions[2::3]
+            pos = np.array([pos_x,pos_y,pos_z]).transpose()
+            L_cycles.append(length)
+            Cycles.append(ids)
+            Pos_cycles.append(pos)
+
+    return Cycles, L_cycles, Pos_cycles
+
 
 
 
@@ -952,21 +1205,23 @@ def xor_clean_rm(Cycle_Basis,k,k_long,long=12):
 
 
 if __name__=="__main__":
-    # file = "dump_last_oh.lammpstrj"
-    # file = "dummp_trimmed.lammpstrj"
+
     # file = "quartz_dupl.data"
-    # file = "dummp_256.lammpstrj"
-    file = "dummp_512.lammpstrj"
-    file = "dummp_1024.lammpstrj"
-    # file = "dummps_snad_last.lammpstrj"
-    # file = "dummps_round_2_last.lammpstrj"
-    # file = "dummps_round_3_last.lammpstrj"
-    # file = "dummps_long_last.lammpstrj"
-
-    list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
     # list_BOX,list_ATOMS = read_data(file,do_scale=False)
-    list_TSTEP=[0]
 
+    # file = "demo/dump_last_oh.lammpstrj"
+    # file = "dummp_trimmed.lammpstrj"
+    # file = "demo/dummp_128.lammpstrj"
+    # file = "demo/dummp_256.lammpstrj"
+    # file = "demo/dummp_512.lammpstrj"
+    # file = "demo/dummp_1024.lammpstrj"
+    # file = "dummps_snad_last.lammpstrj"
+    # file = "demo/dummps_round_2_last.lammpstrj"
+    file = "demo/dummps_round_3_last.lammpstrj"
+    # file = "dummps_long_last.lammpstrj"
+    list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
+
+    list_TSTEP=[0]
     list_Pos = list_ATOMS[:,:,2:]
     list_Types = list_ATOMS[:,:,1]
     Pos = list_ATOMS[-1][:,2:]
@@ -977,6 +1232,56 @@ if __name__=="__main__":
 
     import time
     import networkx as nx
+
+
+    if False:
+        Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
+        a = time.time()
+        Cycles,L_cycles = find_cycles(Bonds)
+        Cycles = xor_rm(Cycles)
+        print(time.time()-a)
+    else:
+        Cycles,L_cycles,Pos_cycles = read_cycles(file="cycles.txt")
+
+    L_cycles = [len(cycle) for cycle in Cycles]
+
+    C = np.zeros((np.max(L_cycles)+3),dtype="int")
+    for k in L_cycles:
+        C[k]+=1
+    print(C)
+
+    visualize_cycles(Pos,Types,Cycles)
+    # save_cycles(Pos,Types,Cycles,file="cycles_60ps.txt")
+    # plot_cycles(L_cycles)
+    # G = nx.from_numpy_array(Bonds)
+    # print(len(Cycles),(G.number_of_edges() - G.number_of_nodes() + 1))
+
+    if False:
+        a = time.time()
+        G = nx.from_numpy_array(Bonds)
+        L = nx.minimum_cycle_basis(G)
+        C2 = []
+        for k in L:
+            C2.append(len(k))
+        b=time.time()
+        print(b-a)
+        A = np.zeros(np.max(C2)+1)
+        for k in C2:
+            A[k]+=1
+        print(A)
+        print(time.time()-a)
+
+
+    # A = [ 0,  0.,  0., 14., 27. ,42., 19.,  3.] # 128
+    # A = [  0.,   0.,   0.,  19.,  35.,  54., 102. ,  2.,   1.] #256
+    # A = [  0.,   0.,   0.,  30.,  34.,  71., 231.,   5.,   2.] #512
+    # A = [  0. ,  0. ,  0. , 39.  ,20.,  67., 581. ,  2.,   0. ,  1.  , 0. ,  1.] #1024
+    # Com = np.array(A + [0] * (np.max(L_cycles)+3-len(A)))
+    # C = np.array(C.tolist() + [0] * (len(A)-len(C)))
+    #
+    # D = C-Com
+    # print(abs(np.sum(D[D<0])))
+    # print((np.sum(D[D>0])))
 
     # cube = 9
     # Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
@@ -1007,64 +1312,64 @@ if __name__=="__main__":
     # print(e-a)
 
 
-
-    a=time.time()
-    Cube = np.linspace(16,40,20)
-    Cube = np.linspace(8,16,8)
-    Cube = [9.2]
-
-    L_m = []
-    L_p = []
-
-    Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
-    G = nx.from_numpy_array(Bonds)
     #
-    for cube in Cube:
-        #
-        # Cycles, L_cycles = count_cycles_test(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=True)
-        Cycles, L_cycles = count_cycles(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=False)
-        # D = xor_clean_rec(Cycles,2,2,12)
-        D = xor_clean_rec(Cycles,1,1,12)
-        C = xor_clean_rm(D,1,1,12)
-        # C = xor_clean_rm_2(Pos,D,1,1,12)
-        # print("C",len(C))
-        # C = xor_clean_rm(Cycles,1,1,12)
-        # C = Cycles[:]
-
-        # Cycles = nx.cycle_basis(G)
-        # # D = xor_clean_rec(Cycles,2,2,12)
-        # C = xor_clean_rec(Cycles,1,1,12)
-        # # C = xor_clean_rm(D,1,1,12)
-
-        C2 = []
-        for k in C:
-            C2.append(len(k))
-        # plot_cycles(C2)
-        b=time.time()
-        print(b-a)
-        # print(G.number_of_edges() - G.number_of_nodes() + 1, len(C2), len(C2) - (G.number_of_edges() - G.number_of_nodes() + 1))
-        # print(np.sum(np.array(C2)!=6))
-
-        C = np.zeros((np.max(C2)+1))
-        for k in C2:
-            C[k] += 1
-        print(len(C2),(G.number_of_edges() - G.number_of_nodes() + 1))
-        C = C * (G.number_of_edges() - G.number_of_nodes() + 1) / len(C2)
-        C = C.round()
-        # A = [ 0,  0.,  0., 14., 27. ,42., 19.,  3.] # 128
-        # A = [  0.,   0.,   0.,  19.,  35.,  54., 102. ,  2.,   1.] #256
-        # A = [  0.,   0.,   0.,  30.,  34.,  71., 231.,   5.,   2.] #512
-        A = [  0. ,  0. ,  0. , 39.  ,20.,  67., 581. ,  2.,   0. ,  1.  , 0. ,  1.] #1024
-        Com = np.array(A + [0] * (np.max(C2)+1-len(A)))
-        C = np.array(C.tolist() + [0] * (len(A)-len(C)))
-
-        D = C-Com
-        L_m.append(abs(np.sum(D[D<0])))
-        L_p.append(np.sum(D[D>0]))
-
-    plt.plot(Cube,L_m,"o-r")
-    plt.plot(Cube,L_p,"o-b")
-    plt.show()
+    # a=time.time()
+    # Cube = np.linspace(16,40,20)
+    # Cube = np.linspace(8,16,8)
+    # Cube = [9.2]
+    #
+    # L_m = []
+    # L_p = []
+    #
+    # Bonds = compute_bonds_graph(Pos,Types,cube=50,periodic=False,Lims=list_BOX[-1])
+    # G = nx.from_numpy_array(Bonds)
+    # #
+    # for cube in Cube:
+    #     #
+    #     # Cycles, L_cycles = count_cycles_test(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=True)
+    #     Cycles, L_cycles = count_cycles(Pos,Types,cube=cube,Lims=list_BOX[-1],periodic=False)
+    #     # D = xor_clean_rec(Cycles,2,2,12)
+    #     D = xor_clean_rec(Cycles,1,1,12)
+    #     C = xor_clean_rm(D,1,1,12)
+    #     # C = xor_clean_rm_2(Pos,D,1,1,12)
+    #     # print("C",len(C))
+    #     # C = xor_clean_rm(Cycles,1,1,12)
+    #     # C = Cycles[:]
+    #
+    #     # Cycles = nx.cycle_basis(G)
+    #     # # D = xor_clean_rec(Cycles,2,2,12)
+    #     # C = xor_clean_rec(Cycles,1,1,12)
+    #     # # C = xor_clean_rm(D,1,1,12)
+    #
+    #     C2 = []
+    #     for k in C:
+    #         C2.append(len(k))
+    #     # plot_cycles(C2)
+    #     b=time.time()
+    #     print(b-a)
+    #     # print(G.number_of_edges() - G.number_of_nodes() + 1, len(C2), len(C2) - (G.number_of_edges() - G.number_of_nodes() + 1))
+    #     # print(np.sum(np.array(C2)!=6))
+    #
+    #     C = np.zeros((np.max(C2)+1))
+    #     for k in C2:
+    #         C[k] += 1
+    #     print(len(C2),(G.number_of_edges() - G.number_of_nodes() + 1))
+    #     C = C * (G.number_of_edges() - G.number_of_nodes() + 1) / len(C2)
+    #     C = C.round()
+    #     # A = [ 0,  0.,  0., 14., 27. ,42., 19.,  3.] # 128
+    #     # A = [  0.,   0.,   0.,  19.,  35.,  54., 102. ,  2.,   1.] #256
+    #     # A = [  0.,   0.,   0.,  30.,  34.,  71., 231.,   5.,   2.] #512
+    #     A = [  0. ,  0. ,  0. , 39.  ,20.,  67., 581. ,  2.,   0. ,  1.  , 0. ,  1.] #1024
+    #     Com = np.array(A + [0] * (np.max(C2)+1-len(A)))
+    #     C = np.array(C.tolist() + [0] * (len(A)-len(C)))
+    #
+    #     D = C-Com
+    #     L_m.append(abs(np.sum(D[D<0])))
+    #     L_p.append(np.sum(D[D>0]))
+    #
+    # plt.plot(Cube,L_m,"o-r")
+    # plt.plot(Cube,L_p,"o-b")
+    # plt.show()
 
 
 
