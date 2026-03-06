@@ -1316,7 +1316,7 @@ def transfo_inv(Pos_transfo,D,P,slice_thickness=5):
         values_mins = curv[ind_mins]
 
         # ind_mins = ind_mins[values_mins<0.5]
-
+        #
         # if len(ind_mins)==0:
         #     plt.plot(curv,"or")
         #     plt.show()
@@ -1381,6 +1381,7 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
 
 
     def calc_dist(Pos,xa,ya,xb,yb):
+        """Compute the distance between positions and the segment drawn by two points"""
         Vec = np.array([xb-xa,yb-ya])
 
         Vec_d_a = Pos - np.array([xa,ya])
@@ -1388,8 +1389,7 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
 
         D_a = np.linalg.norm(Vec_d_a,axis=1)
         D_b = np.linalg.norm(Vec_d_b,axis=1)
-        # print(np.shape(Vec))
-        # print(np.shape(Vec_d_a), np.shape(D_a), np.shape(D_a < D_b))
+
         Vec = Vec.reshape((1,2))
 
         D_a_sup_b = (D_a > D_b).reshape((len(D_a),1))
@@ -1398,6 +1398,7 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
         Vec_calc = Vec * D_b_sup_a - Vec * D_a_sup_b
         Vec_d_calc = Vec_d_a * D_b_sup_a + Vec_d_b * D_a_sup_b
 
+        #Compute the angle to know if the orthogonal of the line containing the Pos is in the segment or not
         cos_angle = np.sum(Vec_d_calc * Vec_calc,axis=1) / np.linalg.norm(Vec_d_calc,axis=1) / np.linalg.norm(Vec_calc,axis=1)
         cos_angle = (cos_angle > 1) * 1 - (cos_angle < -1) * 1 + cos_angle * (cos_angle <= 1) * (cos_angle >= -1)
         angle = np.arccos(cos_angle)
@@ -1407,71 +1408,51 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
 
         return Dist
 
+    ##Compute the pitch as the difference between max z - min z
     N_points = len(Pos_transfo)
-
     min_z = np.min(Pos_transfo[:,2])
-    pitch = np.max(Pos_transfo[:,2]) - np.min(Pos_transfo[:,2])
-    print(pitch,np.max(Pos_transfo[:,2]),np.min(Pos_transfo[:,2]))
-
+    pitch = np.max(Pos_transfo[:,2]) - np.min(Pos_transfo[:,2]) #Not the perfect formula as empty space, but close enough
     N_z = int((pitch // slice_thickness)+1)
 
-    Pos_centered = Pos_transfo - np.mean(Pos_transfo,axis=0)
-    Pos_centered[:,2] = 0
-    Dist = np.sort(np.sum(Pos_centered**2,axis=1)**(1/2))
-    Dist = Dist[int(threshold_cut * N_points):int(1-threshold_cut * N_points)]
-    diameter = np.max(Dist)*2
-    thickness = np.max(Dist) - np.min(Dist)
+
+    if False:
+        #Compute the diameter through the max distance of the flattened helix
+        Pos_centered = Pos_transfo - np.mean(Pos_transfo,axis=0)
+        Pos_centered[:,2] = 0
+        Dist = np.sort(np.sum(Pos_centered**2,axis=1)**(1/2))
+        Dist = Dist[int(threshold_cut * N_points):int(1-threshold_cut * N_points)]
+        diameter = np.max(Dist)*2
+        thickness = np.max(Dist) - np.min(Dist)
 
 
+        #Compute the diameters using a linear regression
+        a,b = np.polyfit(np.arange(len(Dist)),Dist,1)
+        diameter = (a*N_points+b) * 2
+        thickness = a*N_points
 
-    a,b = np.polyfit(np.arange(len(Dist)),Dist,1)
-    diameter = (a*N_points+b) * 2
-    thickness = a*N_points
 
-    plt.plot(Dist,'o-r')
-    x = np.array([0,N_points])
-    plt.plot(x,a*x+b)
-    plt.show()
-    # plt.plot(Pos_transfo[:,0],Pos_transfo[:,1],"or")
-    # plt.show()
-
+    ##Recenter the positions
     mean = np.mean(Pos_transfo,axis=0)
     mean[2] = 0
     Pos_transfo = Pos_transfo - mean
     Means = []
-    M = []
-    # N_z=1
-    # z = Pos_transfo[:,2]/pitch * 2*np.pi
 
+    ##Compute the factor D as the average radius with the center
     for slice_helix in range(N_z):
         Pos_slice = Pos_transfo[(Pos_transfo[:,2] >= slice_helix*slice_thickness + min_z) * (Pos_transfo[:,2] < (slice_helix+1)*slice_thickness + min_z)]
         radius = np.sum(Pos_slice[:,:2]**2,axis=1)**(1/2)
         mean = np.mean(radius,axis=0)
-        # plt.plot(Pos_slice[:,0],Pos_slice[:,1],"or")
-        # plt.plot(mean[0],mean[1],"ob")
-        # plt.show()
-        M.append(mean)
-
         Means.append(np.sum(mean**2)**(1/2))
 
 
-    print("DD",np.mean(Means),np.median(Means))
-    M = np.array(M)
-
-    # plt.plot(Pos_transfo[:,0],Pos_transfo[:,1],"or")
-    # plt.plot(Pos_slice[:,0],Pos_slice[:,1],"or")
-    # # plt.plot(M,[0]*len(M),"ob")
-    # plt.plot(M,[0]*len(M),"ob")
-    # plt.show()
-
     D = np.mean(Means)
-    # print("DT",diameter,thickness)
 
-
+    ##Do the invert transformation to get the slices correctly for the width
     x,y,z = transfo_inv(Pos_transfo,D,pitch)
     Pos = np.array([x,y,z]).transpose()
 
     center = np.mean(Pos_transfo,axis=0)
+
 
     #Do translation to have whole slices using periodic conditions
     Pos_under_z = (Pos[:,2] < min_z).reshape((N_points,1)) * np.array([1.,1.,1.]) * (Pos + np.array([0,0,pitch]))
@@ -1487,12 +1468,6 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
     x,y,z = Pos.transpose()
 
 
-
-
-
-    # plt.plot(np.sort(x),"-r")
-    # plt.plot(np.sort(y),"-b")
-    # plt.show()
     W_int, W_ext = [],[]
     T_int, T_ext = [],[]
     W = []
@@ -1501,10 +1476,9 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
     T = []
 
     for slice_helix in range(N_z):
-    #
     # def slide(value):
     #     slice_helix = int(value)
-
+        ##Get slices and center them
         Pos_slice = Pos_transfo[(Pos[:,2] >= slice_helix*slice_thickness + min_z) * (Pos[:,2] < (slice_helix+1)*slice_thickness + min_z)]
         Diff_slice_mean = center - np.mean(Pos_slice,axis=0)
         Pos_slice = Pos_slice - np.mean(Pos_slice,axis=0)
@@ -1585,47 +1559,41 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
 
 
 
-
-
-
-
         Pos_slice = Pos_slice[:,:2]
 
 
 
-        def points(Pos,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8):
-
-            Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
-            Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
-            Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
-            Dist_4 = calc_dist(Pos,x4,y4,x5,y5)
-            Dist_5 = calc_dist(Pos,x5,y5,x6,y6)
-            Dist_6 = calc_dist(Pos,x6,y6,x7,y7)
-            Dist_7 = calc_dist(Pos,x7,y7,x8,y8)
-            Dist_8 = calc_dist(Pos,x8,y8,x1,y1)
-
-            Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4,Dist_5,Dist_6,Dist_7,Dist_8])
-            Min_dists = np.min(Dists,axis=0)
-            return Min_dists
-
-        def points_arg(Pos,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8):
-
-            Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
-            Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
-            Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
-            Dist_4 = calc_dist(Pos,x4,y4,x5,y5)
-            Dist_5 = calc_dist(Pos,x5,y5,x6,y6)
-            Dist_6 = calc_dist(Pos,x6,y6,x7,y7)
-            Dist_7 = calc_dist(Pos,x7,y7,x8,y8)
-            Dist_8 = calc_dist(Pos,x8,y8,x1,y1)
-
-            Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4,Dist_5,Dist_6,Dist_7,Dist_8])
-            arg_dists = np.argmin(Dists,axis=0)
-            return arg_dists
-
-
-
         if False:
+            def points(Pos,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8):
+
+                Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+                Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+                Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+                Dist_4 = calc_dist(Pos,x4,y4,x5,y5)
+                Dist_5 = calc_dist(Pos,x5,y5,x6,y6)
+                Dist_6 = calc_dist(Pos,x6,y6,x7,y7)
+                Dist_7 = calc_dist(Pos,x7,y7,x8,y8)
+                Dist_8 = calc_dist(Pos,x8,y8,x1,y1)
+
+                Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4,Dist_5,Dist_6,Dist_7,Dist_8])
+                Min_dists = np.min(Dists,axis=0)
+                return Min_dists
+
+            def points_arg(Pos,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8):
+
+                Dist_1 = calc_dist(Pos,x1,y1,x2,y2)
+                Dist_2 = calc_dist(Pos,x2,y2,x3,y3)
+                Dist_3 = calc_dist(Pos,x3,y3,x4,y4)
+                Dist_4 = calc_dist(Pos,x4,y4,x5,y5)
+                Dist_5 = calc_dist(Pos,x5,y5,x6,y6)
+                Dist_6 = calc_dist(Pos,x6,y6,x7,y7)
+                Dist_7 = calc_dist(Pos,x7,y7,x8,y8)
+                Dist_8 = calc_dist(Pos,x8,y8,x1,y1)
+
+                Dists = np.array([Dist_1,Dist_2,Dist_3,Dist_4,Dist_5,Dist_6,Dist_7,Dist_8])
+                arg_dists = np.argmin(Dists,axis=0)
+                return arg_dists
+
             x_min,x_max,y_min,y_max = np.min(Pos_slice[:,0]),np.max(Pos_slice[:,0]),np.min(Pos_slice[:,1]),np.max(Pos_slice[:,1])
             d = 3
             dx = (x_max - x_min)/d
@@ -2030,8 +1998,8 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
 
 
             Types_slice = Types[(Pos[:,2] >= slice_helix*slice_thickness + min_z) * (Pos[:,2] < (slice_helix+1)*slice_thickness + min_z)]
-            # Pos_slice = Pos[:]
-            # Types_slice = Types[:]
+            Pos_slice = Pos[:]
+            Types_slice = Types[:]
 
             # Pos_slice = Pos_transfo[:]
             # Types_slice = Types[:]
@@ -2132,6 +2100,63 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
     print("thickness",thickness)
     print("D",2*D+np.median(T))
     print("diameter",diameter)
+    return pitch, np.median(W), np.mediant(T), 2*D+np.median(T)
+
+def evaluate_surface_reconstruct(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,threshold_lr=2):
+    rota = 1
+    pitch, width, thickness, D = evaluate_dimenions(Pos_transfo,Types,slice_thickness,threshold_cut,threshold_lr)
+    Pos_model_no_rota,Types_model,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(0,D,pitch,width,thickness,int_thick,do_clean=False,circling=True,do_periodic=False,file_duplicate="grid.data")
+    Pos_model,Types_model,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=False,circling=True,do_periodic=False,file_duplicate="grid.data")
+
+    angles = np.arctan2(Pos_model_no_rota[:,1],Pos_model_no_rota[:,0])
+    dz = 1
+    min_z, max_z = np.min(Pos_model_no_rota[:,2]),np.max(Pos_model_no_rota[:,2])
+    Nz = (max_z - min_z)/dz
+    Pos = []
+    for nz in range(Nz):
+        Slice = (Pos_mode_no_rota[:,2] >= (nz * dz)) * (Pos_mode_no_rota[:,2] <= (nz * dz + dz))
+        Pos.append(Pos_model_no_rota[Slice])
+
+    Pos = np.array(Pos)
+
+    plotter = pv.Plotter()
+    plotter.add_axes()
+
+
+
+    Si_c = [240,200,160]
+    O_c = [255,13,13]
+    O_c2 = [0,255,0]
+    H_c = [255,255,255]
+    H_c2 = [0,0,255]
+
+    sp = pv.Sphere(radius=0.4)
+    Pos_transfo = np.array(Pos)
+    Pos_t
+
+    data = pv.PolyData(Pos_transfo[Types==1])
+    pc = data.glyph(scale=False,geom=sp,orient=False)
+    plotter.add_mesh(pc,opacity=0.9,pbr=True,roughness=.5,metallic=.2,color=Si_c,scalars=np.arange(len(Pos_transfo)*len(sp.points)))
+
+
+    Lims, Atom_types, Atom_pos = read_data("grid.data",do_scale=False,atom_style="atom")
+
+
+    for z in range(len(Pos_transfo)-Nz-1):
+
+        # P = [Pos_transfo[z],Pos_transfo[z+1],Pos_transfo[z+Nz],Pos_transfo[z+Nz+1]]
+        P = [Pos_transfo[z],Pos_transfo[z+Nz]]
+        x_coord,y_coord,z_coord = np.array(P).transpose()
+        grid = pv.StructuredGrid(x_coord,y_coord,z_coord)
+        plotter.add_mesh(grid,opacity=0.9,pbr=True,roughness=.5,metallic=.2)
+
+
+
+
+
+
+
+    # Pos_model =
 
 
 
@@ -2141,8 +2166,8 @@ def evaluate_dimenions(Pos_transfo,Types,slice_thickness=5,threshold_cut=0.01,th
 
 if __name__=="__main__":
     #
-    file = "quartz_dupl.data"
-    list_BOX,list_ATOMS = read_data(file,do_scale=False)
+    # file = "quartz_dupl.data"
+    # list_BOX,list_ATOMS = read_data(file,do_scale=False)
 
 
     # file = "demo/dump_last_oh.lammpstrj"
@@ -2155,7 +2180,7 @@ if __name__=="__main__":
     # file = "demo/dummps_snad_last.lammpstrj"
     # file = "demo/dummps_round_2_last.lammpstrj"
     # file = "demo/dummps_round_3_last.lammpstrj"
-    # file = "dummp_144_last.lammpstrj" #Large 60ps
+    file = "dummp_144_last.lammpstrj" #Large 60ps
     # file = "dummp_145_last.lammpstrj" #Large 200ps
     # file = "dummp_156_last.lammpstrj" #New 60ps
     # file = "dummp_157_last.lammpstrj" #New 200ps
@@ -2166,7 +2191,7 @@ if __name__=="__main__":
     # file = "demo/dummps_long_last.lammpstrj"
     # file = "demo/dummp_trimmed_long_0K.lammpstrj"
     # file = "demo/dummp_trimmed_0K_last.lammpstrj"
-    # list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
+    list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
 
 
     list_TSTEP=[0]
@@ -2185,4 +2210,6 @@ if __name__=="__main__":
     # save_defects("defects.xyz",Pos,Types,periodic=True,Lims=list_BOX[-1])
     # analyze_defects(Pos,Types,periodic=True,Lims=list_BOX[-1])
     # analyze_density(Pos)
+    # evaluate_dimenions(Pos,Types,slice_thickness=8,show=False,threshold_cut=0.001)
     evaluate_dimenions(Pos,Types,slice_thickness=8,show=False,threshold_cut=0.001)
+    # evaluate_surface_reconstruct(Pos,Types,slice_thickness=8,threshold_cut=0.001)
