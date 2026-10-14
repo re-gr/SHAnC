@@ -10,10 +10,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from Construction.import_libraries import *
-from Construction.distortion import *
-from Construction.analysis import *
-from Construction.read_write import *
+from construction.import_libraries import *
+from construction.distortion import *
+from construction.analysis import *
+from construction.read_write import *
 
 # Physical type and mass maps used by the test harness
 type_map = {"Si": 1, "O": 2}
@@ -78,4 +78,3 @@ file_path = os.path.join(current_dir, "files_lattices", "Model_file", "beta_quar
     file_output_cast="quartz_int.data",
     mass_map=mass_map,
 )
-

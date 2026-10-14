@@ -14,10 +14,10 @@ validation.
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from Construction.import_libraries import *
-from Construction.distortion import *
-from Construction.read_write import *
-from Construction.analysis import *
+from construction.import_libraries import *
+from construction.distortion import *
+from construction.read_write import *
+from construction.analysis import *
 from scipy.spatial import cKDTree
 
 BOND_TYPE_MAP = {
@@ -107,14 +107,14 @@ def external_surface(Pos, list_BOX, dz=1.0, n_points=1000, twist=False):
     for z0 in z_values:
         mask = _slice_z(Pos, z0, dz)
         Pos_slice = Pos[mask]
-        
+
         if len(Pos_slice)==0:
             continue
 
         mask_slice, center1, R1 = circle(Pos_slice, z0, dz)
         if mask_slice is None:
             continue
-        
+
         circle_pts1, closest_indices1, min_dist1, theta1 = circle_min_distances(Pos_slice, center1, R1, n_points=n_points)
         if not twist:
             center2, R2 = second_circle(circle_pts1, min_dist1, theta1)
@@ -126,12 +126,12 @@ def external_surface(Pos, list_BOX, dz=1.0, n_points=1000, twist=False):
         global_indices = np.where(mask)[0][slice_indices]
         contour_indices_global.extend(global_indices)
         contour_per_slice.append((z0, Pos_slice[slice_indices]))
-        
+
     contour_indices_global = np.unique(contour_indices_global)
     Pos_contour = Pos[contour_indices_global]
 
     return Pos_contour, contour_indices_global, contour_per_slice
-    
+
 
 
 # ---------------------------------------------------------------------------
@@ -153,42 +153,42 @@ def compute_surface_method_1(n_Si_atoms, n_O_atoms, n_H_atoms):
 
 def _order_contour_trigo(Pos_slice_contour):
     """
-    Orders the contour points sequentially by following the perimeter 
+    Orders the contour points sequentially by following the perimeter
     via a nearest-neighbor chain, preventing 'squiggles' caused by non-convex shapes.
     """
     xy = Pos_slice_contour[:, :2].copy()
     n_pts = len(xy)
-    
+
     if n_pts == 0:
         return Pos_slice_contour, np.array([0, 0])
-        
+
     center = np.mean(xy, axis=0)
-    
+
     # Track which points have been added to our ordered path
     visited = np.zeros(n_pts, dtype=bool)
     ordered_indices = []
-    
+
     # Start at an arbitrary point (e.g., the first one)
     current_idx = 0
     ordered_indices.append(current_idx)
     visited[current_idx] = True
-    
+
     # Greedy walk to build a continuous loop
     for _ in range(n_pts - 1):
         current_pt = xy[current_idx]
-        
+
         # Calculate distances from the current point to all other unvisited points
         dists = np.linalg.norm(xy - current_pt, axis=1)
         dists[visited] = np.inf  # Ignore already visited points
-        
+
         # Move to the closest unvisited point
         next_idx = np.argmin(dists)
         ordered_indices.append(next_idx)
         visited[next_idx] = True
         current_idx = next_idx
-        
+
     ordered_points = Pos_slice_contour[ordered_indices]
-    
+
     return ordered_points, center
 
 def _contour_perimeter(ordered_points):
@@ -252,17 +252,17 @@ def _perimeter_circle1_minus_cirlcle2(C1, R1, C2, R2):
     """
     distance_centres = np.linalg.norm(np.array(C2) - np.array(C1))
     if distance_centres + R2 <= R1:
-        return 2*np.pi*R1 
+        return 2*np.pi*R1
     if distance_centres >= R1 + R2:
         return 2*np.pi*R1
     cos_angle1 = np.clip((distance_centres**2 + R1**2 - R2**2)/(2*distance_centres*R1), -1, 1)
-    cos_angle2 = np.clip((distance_centres**2 + R2**2 - R1**2)/(2*distance_centres*R2), -1, 1) 
-    angle1 = np.arccos(cos_angle1) 
+    cos_angle2 = np.clip((distance_centres**2 + R2**2 - R1**2)/(2*distance_centres*R2), -1, 1)
+    angle1 = np.arccos(cos_angle1)
     angle2 = np.arccos(cos_angle2)
 
-    arc_C1_outside_C2 = R1*(2*np.pi - 2*angle1) 
+    arc_C1_outside_C2 = R1*(2*np.pi - 2*angle1)
     arc_C2_inside_C1 = R2*(2*angle2)
-     
+
     return arc_C1_outside_C2 + arc_C2_inside_C1
 
 def compute_surface_method_3(Pos, list_BOX, dz = 1.0, n_points = 1000):
@@ -456,9 +456,9 @@ def compute_surface_method_5(Pos, diameter, width, thickness, pitch, list_BOX, n
 
 
 def visualize_slice_with_circles(
-    Pos, 
-    z0, 
-    dz=1.0, 
+    Pos,
+    z0,
+    dz=1.0,
     n_points=1000,
     point_size=40,          # Controls size of non-surface points
     surface_size=55,        # Controls size of surface points
@@ -474,7 +474,7 @@ def visualize_slice_with_circles(
     # 1. Isolate the slice points
     mask = _slice_z(Pos, z0, dz)
     Pos_slice = Pos[mask]
-    
+
     if len(Pos_slice) == 0:
         print(f"No atoms found in slice z = {z0} +/- {dz/2}")
         return
@@ -495,7 +495,7 @@ def visualize_slice_with_circles(
 
     # 4. Identify Surface vs. Core points
     surface_indices = np.unique(np.concatenate([closest_indices1, closest_indices2]))
-    
+
     is_surface = np.zeros(len(Pos_slice), dtype=bool)
     is_surface[surface_indices] = True
 
@@ -506,34 +506,34 @@ def visualize_slice_with_circles(
     plot_theta = np.linspace(0, 2 * np.pi, 200)
     c1_line_x = center1[0] + R1 * np.cos(plot_theta)
     c1_line_y = center1[1] + R1 * np.sin(plot_theta)
-    
+
     c2_line_x = center2[0] + R2 * np.cos(plot_theta)
     c2_line_y = center2[1] + R2 * np.sin(plot_theta)
 
     # 6. Plotting
     plt.figure(figsize=(9, 9))
-    blue1 = (103/255.0, 179/255.0, 179/255.0) 
-    blue2 = (50/255.0, 95/255.0, 255/255.0) 
+    blue1 = (103/255.0, 179/255.0, 179/255.0)
+    blue2 = (50/255.0, 95/255.0, 255/255.0)
     red = (192/255.0, 0/255.0, 0/255.0)
     orange = (255/255, 192/255, 0/255)
-    
+
     # Core atoms
     plt.scatter(
-        remaining_pts[:, 0], remaining_pts[:, 1], 
+        remaining_pts[:, 0], remaining_pts[:, 1],
         color=blue2, s=70, label='Slice Points',
     )
-    
+
     # Surface atoms (slightly larger with an outline by default)
     plt.scatter(
-        surface_pts[:, 0], surface_pts[:, 1], 
-        color=orange, s=100, linewidth=0.5, 
+        surface_pts[:, 0], surface_pts[:, 1],
+        color=orange, s=100, linewidth=0.5,
         label='Surface Points', zorder=3
     )
-    
+
     # Bounding reference circles
     plt.plot(c1_line_x, c1_line_y, c=blue1, linewidth=circle_linewidth, label='First Circle')
     plt.plot(c2_line_x, c2_line_y, c=red, linewidth=circle_linewidth, label='Second Circle')
-    
+
     if highlight_method_3:
         # Method 2
         contour_pts = Pos_slice[surface_indices]
@@ -541,8 +541,8 @@ def visualize_slice_with_circles(
         m2_xy = ordered_pts[:,:2]
         m2_closed = np.vstack([m2_xy, m2_xy[0]])
         plt.plot(m2_closed[:,0], m2_closed[:,1], c=orange, linewidth = 10.0, zorder=4, label="Slice-based Perimeter Method")
-        
-        
+
+
         # Method 3
         distance_centres = np.linalg.norm(np.array(center2) - np.array((center1)))
         if distance_centres + R2 <= R1:
@@ -552,19 +552,19 @@ def visualize_slice_with_circles(
         else:
             center_vector_angle = np.arctan2(center2[1] - center1[1], center2[0] - center1[0])
             cos_angle1 = np.clip((distance_centres**2 + R1**2 - R2**2)/(2*distance_centres*R1), -1, 1)
-            cos_angle2 = np.clip((distance_centres**2 + R2**2 - R1**2)/(2*distance_centres*R2), -1, 1) 
-            angle1 = np.arccos(cos_angle1) 
+            cos_angle2 = np.clip((distance_centres**2 + R2**2 - R1**2)/(2*distance_centres*R2), -1, 1)
+            angle1 = np.arccos(cos_angle1)
             angle2 = np.arccos(cos_angle2)
 
             c1_pts = np.stack([c1_line_x, c1_line_y], axis = 1)
             dist_to_c2 = np.linalg.norm(c1_pts - center2, axis = 1)
             outer_c1_pts = c1_pts[dist_to_c2 >= R2 - 1e-5]
-            
+
 
             c2_pts = np.stack([c2_line_x, c2_line_y], axis = 1)
             dist_to_c1 = np.linalg.norm(c2_pts - center1, axis = 1)
             inner_c2_pts = c2_pts[dist_to_c1 <= R1 + 1e-5]
-            
+
 
 
             plt.plot(outer_c1_pts[:,0], outer_c1_pts[:,1], c='black', linewidth=10.0, alpha = 1.0, label='Circle Perimeter Method')
@@ -587,10 +587,10 @@ def visualize_slice_with_circles(
                     va='bottom',       # Vertical alignment
                     wrap=True,         # Automatically wraps if given a bounding box layout
                     bbox=dict(         # Text background properties
-                        boxstyle="round,pad=0.3", 
-                        facecolor="white", 
-                        edgecolor="gray", 
-                        alpha=0.8, 
+                        boxstyle="round,pad=0.3",
+                        facecolor="white",
+                        edgecolor="gray",
+                        alpha=0.8,
                         linewidth=30.0
                     )
                 )
@@ -599,7 +599,7 @@ def visualize_slice_with_circles(
     plt.gca().set_aspect('equal', adjustable='box')
     plt.axis('off')
     plt.title(f"Helix Slice Contour Visualization", fontsize=30, pad=15)
-    plt.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.9)    
+    plt.legend(loc='upper right', frameon=True, facecolor='white', framealpha=0.9)
     plt.tight_layout()
     plt.show()
 
@@ -677,7 +677,7 @@ def _load_molecule_from_sdf(file, type_map={}):
     n_atoms = int(counts_line[0:3])
     n_bonds  = int(counts_line[3:6])
 
-    # Atom block 
+    # Atom block
     mol_pos   = []
     symbols   = []           # element symbol per atom
     mol_types = []
@@ -706,7 +706,7 @@ def _load_molecule_from_sdf(file, type_map={}):
     # auto_type_map: type_id -> symbol  (inverse of _working_map)
     auto_type_map = {v: k for k, v in _working_map.items()}
 
-    # Bond block 
+    # Bond block
     bonds = []
     bond_start = 4 + n_atoms
 
@@ -757,7 +757,7 @@ def _prepare_mol(file, type_map={}):
     dists_from_H = np.linalg.norm(mol_pos[C_indices] - terminal_H_pos, axis=1)
     attach_C_idx = C_indices[np.argmin(dists_from_H)]      # 0-based
 
-    # Remove the C-H bond for the deleted H 
+    # Remove the C-H bond for the deleted H
     h1 = terminal_H_idx + 1                                 # convert to 1-based
     bonds_clean = [(bt, i1, i2) for bt, i1, i2 in bonds
                    if i1 != h1 and i2 != h1]
@@ -808,7 +808,7 @@ def _compute_outward_normal(Si_pos, tree, Pos_all, cutoff = 6.0):
 
     if inward_norm < 1e-6:
         return np.array([0.0, 0.0, 1.0])
-    
+
     outward = -inward/inward_norm
     return outward
 
@@ -856,7 +856,7 @@ def _align_mol_to_normal(mol_pos, mol_types, attach_idx, outward_normal, type_ma
         c2 = np.dot(p, e2)
         c3 = np.dot(p, e3)
         aligned[i] = c1*f1 + c2*f2 + c3*f3
-    
+
     return aligned
 
 # ---------------------------------------------------------------------------
@@ -973,7 +973,7 @@ def find_O_triangle_sites(
         print("  --> fewer than 3 candidates; no triangles possible.")
         return np.empty((0, 3)), []
 
-    # Step 2: pairs within O_triangle_radius 
+    # Step 2: pairs within O_triangle_radius
     tree_sb = cKDTree(Pos_sb)
     pair_set = tree_sb.query_pairs(r=O_triangle_radius)   # set of (i, j) with i < j
 
@@ -983,7 +983,7 @@ def find_O_triangle_sites(
         adj[i].add(j)
         adj[j].add(i)
 
-    # Step 3: enumerate triangles 
+    # Step 3: enumerate triangles
     triangles = []
     for i in range(len(Pos_sb)):
         for j in sorted(adj[i]):
@@ -1015,10 +1015,10 @@ def _fix_H_on_anchor_C(
     mol_placed, attach_C_idx, mol_types, auto_type_map,
     anchor_C_pos, outward,
     tree_surface,
-    # thresholds 
+    # thresholds
     min_H_any       = 0.8,
     bond_cutoff     = 1.2,
-    # rotation sweep 
+    # rotation sweep
     use_rotation    = True,
     n_steps         = 72,
     # outward nudge
@@ -1089,7 +1089,7 @@ def _fix_H_on_anchor_C(
             trial = _rotate(mol_placed, angle)
             if _H_ok(trial):
                 return trial, True
-            
+
     if use_nudge and not use_rotation:
         for delta in nudges:
             trial = _nudge(mol_placed, delta)
@@ -1147,7 +1147,7 @@ def graft_molecules(
         print("Target density --> 0 molecules. Returning unchanged system.")
         return Pos.copy(), Types.copy(), Lims, 0
 
-    # _prepare_mol now returns bonds_tpl 
+    # _prepare_mol now returns bonds_tpl
     mol_pos_tpl, mol_types_tpl, bonds_tpl, attach_C_idx, auto_type_map, terminal_H_idx = _prepare_mol(mol_file, type_map)
     n_atoms_mol = len(mol_types_tpl)
 
@@ -1275,12 +1275,12 @@ def graft_molecules(
                 skipped += 1
                 continue
 
-            # Placement successful 
+            # Placement successful
             all_mol_positions.append(mol_placed)
             all_mol_types.append(mol_types_tpl)
             current_mol_pos = np.vstack([current_mol_pos, mol_placed])
 
-            # build global bonds for this molecule 
+            # build global bonds for this molecule
             # 0-based offset: surface atoms come first, then molecules in order
             offset = n_surface + mol_count * n_atoms_mol
 
@@ -1365,7 +1365,7 @@ def compute_grafted_Si_C_distances(Pos, Types, mol_pos, mol_types, Si_type=1, C_
             missing += 1
     distances = np.array(distances)
 
-    print(f"Computed Si-C distances for {len(distances)}")   
+    print(f"Computed Si-C distances for {len(distances)}")
     print(f"mean {distances.mean():.3f} Ã…, min {distances.min():.3f} Ã…, max {distances.max():.3f} Ã…")
     bins = np.arange(distances.min() - dr, distances.max() + dr, dr)
     counts, edges = np.histogram(distances, bins = bins)
@@ -1412,23 +1412,23 @@ def analyze_discarded_with_plots(
         if len(all_mol_positions) >= 3000:
             break
 
-        outward = _compute_outward_normal(Si_pos, tree_surface, Pos_clean, cutoff=10.0)  
+        outward = _compute_outward_normal(Si_pos, tree_surface, Pos_clean, cutoff=10.0)
         # corrected = _validate_and_correct_normal(outward, Si_pos, tree_surface, Pos_clean, Types_clean, O_type=2, min_C_O=1.3, d_surface=d_surface)
         mol_align = _align_mol_to_normal(mol_pos_tpl, mol_types_tpl, attach_C_idx, outward, auto_type_map)
-        
+
         anchor_C = Si_pos + d_surface * outward
         mol_placed = mol_align + anchor_C
         mol_placed, H_ok = _fix_H_on_anchor_C(mol_placed, attach_C_idx, mol_types_tpl, auto_type_map, anchor_C, outward, tree_surface,
                                                 min_H_any=0.8, bond_cutoff=1.2, use_rotation=False, n_steps=72,
                                                 use_nudge=True, max_nudge=0.5, n_nudge_steps=20)
-        
+
         if not H_ok:
             skipped += 1
             skipped_bc_H +=1
             continue
 
         symbols_mol = np.array([auto_type_map[t] for t in mol_types_tpl])
-        free_idx = [i for i in range(len(mol_placed)) if i != attach_C_idx and symbols_mol[i] != 'H']  
+        free_idx = [i for i in range(len(mol_placed)) if i != attach_C_idx and symbols_mol[i] != 'H']
         collision = any(len(tree_surface.query_ball_point(mol_placed[i], d_surface)) > 0 for i in free_idx)
         # collision = any(len(tree_surface.query_ball_point(p, d_mol_surface)) > 0 for p in mol_placed)
         collision_mol = False
@@ -1450,16 +1450,16 @@ def analyze_discarded_with_plots(
         # D. Calculate Surface Distance
         d_min = min(tree_surface.query(mol_placed[i])[0] for i in free_idx)
         valid_d_mins.append(d_min)
-        
+
         # Track 'discarded' subset: passed B & C, but falls below target_threshold
         if d_min < target_threshold:
             discarded_mols.append(mol_placed)
-        
+
         # We 'accept' it for the rest of the simulation to keep the mol-mol check valid
         current_accepted_pos = np.vstack([current_accepted_pos, mol_placed])
 
     valid_d_mins = np.array(valid_d_mins)
-    
+
     print("Anchors skipped because of Mol-Mol check", skipped_bc_mol)
     print("Anchors skipped because of H check", skipped_bc_H)
     print("How many candidates passed H-fix & Mol-Mol checks?", len(valid_d_mins))
@@ -1503,7 +1503,7 @@ def analyze_discarded_with_plots(
     ax2.axvline(target_threshold, color=dark_dark_purple, linestyle='--',
                 label=f'Discard Threshold: {target_threshold}angstrom')
     ax2.legend()
-    
+
     plt.tight_layout()
     plt.show()
 
@@ -1574,23 +1574,23 @@ def _prepare_chromophore(file, type_map={}):
     for o_idx in O_indices:
         o_id = o_idx + 1  # Convert to 1-based
         neighbors = adj[o_id]
-        
+
         # Check for bonded Hydrogen (The -OH part)
         bonded_H = [n for n in neighbors if symbols[n-1] == 'H']
         if not bonded_H:
             continue
-            
+
         # Check for bonded Carbon
         bonded_C = [n for n in neighbors if symbols[n-1] == 'C']
         if not bonded_C:
             continue
-            
+
         c_id = bonded_C[0]
         c_neighbors = adj[c_id]
-        
+
         # Identification of the C in O=C-OH
         other_O = [n for n in c_neighbors if symbols[n-1] == 'O' and n != o_id]
-        
+
         if other_O:
             carboxyl_C_idx = c_id - 1  # Back to 0-based
             remove_OH_idx = o_idx
@@ -1771,7 +1771,7 @@ def compute_surface_normal_(target_pos, tree_surface, Pos, Types, search_radius=
     ids = tree_surface.query_ball_point(target_pos, r = search_radius)
     if not ids:
         raise ValueError("No surface atoms found within cutoff for normal estimation.")
-    
+
     neighbor = tree_surface.data[ids]
 
     # neighbor_pos = Pos[ids]
@@ -1783,7 +1783,7 @@ def compute_surface_normal_(target_pos, tree_surface, Pos, Types, search_radius=
     norm_length = np.linalg.norm(normal)
     if norm_length < 1e-6:
         raise ValueError("Degenerate normal vector (target at centroid).")
-    
+
     return normal / norm_length
 
 
@@ -1809,11 +1809,11 @@ def _remove_one_NH(anchor_pos, anchor_types, anchor_type_map):
     if len(NH_H_idxs) == 0:
         raise ValueError("No H bonded to N found: anchor may already be fully substituted.")
 
-    remove_idx       = int(NH_H_idxs[0])                    # 0-based 
+    remove_idx       = int(NH_H_idxs[0])                    # 0-based
     anchor_pos_new   = np.delete(anchor_pos,   remove_idx, axis=0)
     anchor_types_new = np.delete(anchor_types, remove_idx)
 
-    return anchor_pos_new, anchor_types_new, remove_idx      
+    return anchor_pos_new, anchor_types_new, remove_idx
 
 # Main chromophore grafting function
 
@@ -1842,7 +1842,7 @@ def graft_chromophores(
       N-C amide bond between each anchor and its chromophore.
     """
 
-    # _prepare_chromophore now returns bonds_tpl 
+    # _prepare_chromophore now returns bonds_tpl
     chrom_pos_t, chrom_types_t, chrom_bonds_tpl, carboxyl_C_idx, chrom_auto_map = \
         _prepare_chromophore(chrom_file, chrom_type_map)
     n_atoms_chrom      = len(chrom_types_t)
@@ -1869,7 +1869,7 @@ def graft_chromophores(
 
     for k, (anchor_pos, anchor_types) in enumerate(zip(anchor_pos_list, anchor_types_list)):
         try:
-            # _remove_one_NH now returns removed_H_local_idx 
+            # _remove_one_NH now returns removed_H_local_idx
             anchor_pos_mod, anchor_types_mod, removed_H_local_idx = \
                 _remove_one_NH(anchor_pos, anchor_types, anchor_type_map)
             N_pos, anchor_axis = _anchor_N_axis(anchor_pos, anchor_types, anchor_type_map)
@@ -1877,7 +1877,7 @@ def graft_chromophores(
             skipped += 1
             continue
 
-        # build anchor bonds for this anchor 
+        # build anchor bonds for this anchor
         # 0-based offset of anchor k in the final array
         anchor_offset = n_surf + k * n_atoms_anchor_mod
 
@@ -1897,7 +1897,7 @@ def graft_chromophores(
                                for bt, i1, i2 in anchor_bonds_mod]
         all_bonds.extend(global_anchor_bonds)
 
-        # Chromophore placement (rotation loop, unchanged logic) 
+        # Chromophore placement (rotation loop, unchanged logic)
         ideal_angle    = 0
         search_offsets = np.linspace(-np.pi, np.pi, rotation_steps)
         search_offsets = sorted(search_offsets, key=abs)
@@ -1934,14 +1934,14 @@ def graft_chromophores(
                        for p in chrom_trial):
                     continue
 
-            # Placement successful 
+            # Placement successful
             all_chrom_pos.append(chrom_trial)
             all_chrom_types.append(chrom_types_t.copy())
             anchor_pos_list_new.append(anchor_pos_mod)
             anchor_types_list_new.append(anchor_types_mod)
             current_chrom_pos = np.vstack([current_chrom_pos, chrom_trial])
 
-            # chromophore global bonds 
+            # chromophore global bonds
             chrom_offset = (n_surf
                             + n_anchors * n_atoms_anchor_mod
                             + placed * n_atoms_chrom)
@@ -1950,7 +1950,7 @@ def graft_chromophores(
                                   for bt, i1, i2 in chrom_bonds_tpl]
             all_bonds.extend(global_chrom_bonds)
 
-            #  N-C amide bond (anchor N --> chromophore carboxyl C) 
+            #  N-C amide bond (anchor N --> chromophore carboxyl C)
             symbols_mod         = np.array([anchor_type_map[t] for t in anchor_types_mod])
             N_idx_mod           = int(np.where(symbols_mod == 'N')[0][0])
             N_global_1based     = anchor_offset + N_idx_mod + 1

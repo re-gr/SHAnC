@@ -17,8 +17,8 @@ Dependencies:
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from Construction.import_libraries import *
-from Construction.read_write import *
+from construction.import_libraries import *
+from construction.read_write import *
 
 
 # ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ def compute_hist_neighbors(Pos, Types,
                 )
 
                 cat_mask_pad = Types_trunc == cation_type
-            
+
                 Cat_count_An = Cat_count_An[Ind_uniq_in_pad[cat_mask_pad]]
                 cat_idx = mask_u[:Num_at][Types == cation_type]
                 Cat_count_An_tot[cat_idx] = Cat_count_An
@@ -339,7 +339,7 @@ def compute_hist_neighbors(Pos, Types,
 
                 # Distances for RDF
                 Pos_Cat_u = Pos_trunc_uniq[Types_trunc_uniq == cation_type]
-                if metal: 
+                if metal:
                     if len(Pos_Cat_u) < 2:
                         continue
                     D = sd.cdist(Pos_Cat_u, Pos_Cat_u)
@@ -352,7 +352,7 @@ def compute_hist_neighbors(Pos, Types,
                         continue
                     D = sd.cdist(Pos_Cat_u, Pos_An_u)
                     D[D == 0] = 100
-                
+
                 Dist_list.append(D[D < rdf_max].ravel())
 
     return Dist_list, Cat_count_An_tot[:Num_Cat], An_count_Cat_tot[:Num_An]
@@ -673,7 +673,7 @@ def check_metal_structure(Pos, Types,
     cn_freqs = [report['cn_counts'][c] for c in cn_vals]
 
     fig, ax = plt.subplots(figsize =(12,8))
-    
+
     for spine in ax.spines.values():
         spine.set_linewidth(5)
 
@@ -1225,7 +1225,7 @@ def validate_unit_cell(Atom_pos, Atom_types, Lims,
     Verify that every type-1 atom has exactly o_neighbours type-2 neighbours
     at expected_dist ± tol (Å), using minimum-image periodic boundary conditions.
                        type1=1, o_type=2, o_neighbours=4):
-    """                   
+    """
     L = np.array([Lims[0][1] - Lims[0][0],
                   Lims[1][1] - Lims[1][0],
                   Lims[2][1] - Lims[2][0]])
@@ -1255,7 +1255,7 @@ def validate_unit_cell(Atom_pos, Atom_types, Lims,
 
 def visualize_structure(Pos, Types, Lims=None, point_size=12, type_colors=None,
                         sphere=True, parallel_proj=True,
-                        draw_bonds=False, max_bond_dist=2.0): 
+                        draw_bonds=False, max_bond_dist=2.0):
     """Render the atomic structure in 3D using PyVista.
 
     Parameters
@@ -1434,4 +1434,3 @@ def visualize_close_contacts(Pos, Types, Lims=None, threshold=1.0,
             style="wireframe",
         )
     plotter.show()
-

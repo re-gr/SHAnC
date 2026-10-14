@@ -8,8 +8,8 @@ cycle populations and 3D cycle geometries.
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from Construction.import_libraries import *
-from Construction.analysis import *
+from construction.import_libraries import *
+from construction.analysis import *
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +346,7 @@ def save_cycles(Pos, Types, Cycles, file="cycles.txt",
                 if len(cycle) != j:
                     continue
 
-                # collect bridging O (local index) for each edge 
+                # collect bridging O (local index) for each edge
                 o_local = []
                 for k in range(j):
                     si_i = cycle[k]
@@ -357,16 +357,16 @@ def save_cycles(Pos, Types, Cycles, file="cycles.txt",
                 # write: length
                 f.write("{} ".format(j))
 
-                # write: Si indices 
+                # write: Si indices
                 for idx in cycle:
                     f.write("{} ".format(idx))
 
-                # write: O global indices 
+                # write: O global indices
                 for o_idx in o_local:
                     gid = int(O_global[o_idx]) if o_idx >= 0 else -1
                     f.write("{} ".format(gid))
 
-                # write: interleaved positions Si0 O01 Si1 O12 … 
+                # write: interleaved positions Si0 O01 Si1 O12 …
                 for k in range(j):
                     px, py, pz = Pos_Si[cycle[k]]
                     f.write("{:3.3f} {:3.3f} {:3.3f} ".format(px, py, pz))
@@ -377,7 +377,7 @@ def save_cycles(Pos, Types, Cycles, file="cycles.txt",
                         px, py, pz = float('nan'), float('nan'), float('nan')
                     f.write("{:3.3f} {:3.3f} {:3.3f} ".format(px, py, pz))
                 f.write("\n")
-        
+
 
 
 def read_cycles(file="cycles.txt"):
@@ -473,7 +473,7 @@ def extract_cycles_to_files(Cycles, L_cycles, O_ids, Types, Pos,
         ext_o = get_external_oxygens_validated(
         Pos, Types, Cycles[i], O_ids[i], threshold=threshold
         )
-        
+
         if ext_o is None:
             continue
 
@@ -527,33 +527,30 @@ def extract_cycles_to_files(Cycles, L_cycles, O_ids, Types, Pos,
 
 def add_hydrogen_to_oxygens(Pos, Types, external_o_indices, cycle_si_local_indices, bond_length=0.96):
     """
-    Adds H to the validated external oxygens. 
+    Adds H to the validated external oxygens.
     It points the H away from the nearest Si.
     """
     if not external_o_indices:
         return np.array([]).reshape(0, 3)
-        
+
     new_h_pos = []
     si_global_indices = np.where(Types == 1)[0]
     cycle_si_global = si_global_indices[cycle_si_local_indices]
     cycle_si_pos = Pos[cycle_si_global]
-    
+
     for o_idx in external_o_indices:
         o_p = Pos[o_idx]
         # Find the specific Si this O belongs to (directionality)
         dists = np.linalg.norm(cycle_si_pos - o_p, axis=1)
         nearest_si_idx = np.argmin(dists)
         si_p = cycle_si_pos[nearest_si_idx]
-        
+
         # Vector from Si to O
         vec = o_p - si_p
         unit_vec = vec / np.linalg.norm(vec)
-        
+
         # Position H along that vector
         h_p = o_p + (unit_vec * bond_length)
         new_h_pos.append(h_p)
-        
+
     return np.array(new_h_pos)
-
-
-  

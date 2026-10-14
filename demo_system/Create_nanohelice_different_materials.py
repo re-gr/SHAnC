@@ -3,10 +3,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from Construction.import_libraries import *
-from Construction.distortion import *
-from Construction.analysis import *
-from Construction.read_write import *
+from construction.import_libraries import *
+from construction.distortion import *
+from construction.analysis import *
+from construction.read_write import *
 
 
 # ---------------------------------------------------------------------------
@@ -59,8 +59,8 @@ file_path = os.path.join(current_dir, "files_lattices", "Au.data")
 
 Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota, diameter,pitch,width,thickness,int_thick, Twist = False,
                                                                                                             do_clean=False,
-                                                                                                            file_duplicate=file_path,file_output = "au_dupl.data", 
-                                                                                                            file_output_cast = "au_int.data", 
+                                                                                                            file_duplicate=file_path,file_output = "au_dupl.data",
+                                                                                                            file_output_cast = "au_int.data",
                                                                                                             mass_map = mass_map, metal = True)
 
 # ---------------------------------------------------------------------------
@@ -76,8 +76,8 @@ file_path = os.path.join(current_dir, "files_lattices", "Ag.data")
 
 Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota, diameter,pitch,width,thickness,int_thick, Twist = False,
                                                                                                             do_clean=False,
-                                                                                                            file_duplicate=file_path,file_output = "ag_dupl.data", 
-                                                                                                            file_output_cast = "ag_int.data", 
+                                                                                                            file_duplicate=file_path,file_output = "ag_dupl.data",
+                                                                                                            file_output_cast = "ag_int.data",
                                                                                                             mass_map = mass_map, metal = True)
 
 
@@ -96,7 +96,6 @@ file_path = os.path.join(current_dir, "files_lattices", "Cu.data")
 
 Pos_transfo,Types,Lims_tot,Angles_OH, Pos_transfo_int, Types_int, Lims_tot_int = create_syst(rota, diameter,pitch,width,thickness,int_thick, Twist = False,
                                                                                                             do_clean=False,
-                                                                                                            file_duplicate=file_path,file_output = "cu_dupl.data", 
-                                                                                                            file_output_cast = "cu_int.data", 
+                                                                                                            file_duplicate=file_path,file_output = "cu_dupl.data",
+                                                                                                            file_output_cast = "cu_int.data",
                                                                                                             mass_map = mass_map, metal = True)
-

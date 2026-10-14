@@ -13,7 +13,7 @@ Functions include:
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from Construction.import_libraries import *
+from construction.import_libraries import *
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ def read_xyz(file_name, type_map=None, metal=False):
         # lattice for metal systems using the nearest-neighbour distance.
         if not box:
             if metal:
-                # d_NN = a / sqrt(2) for FCC 
+                # d_NN = a / sqrt(2) for FCC
                 D = sd.cdist(positions, positions)
                 np.fill_diagonal(D, np.inf)
                 d_NN = np.min(D)
