@@ -15,7 +15,6 @@ import re
 from collections import defaultdict
 import os
 import time
-import networkx as nx
 from pathlib import Path
 from collections import Counter
 
@@ -28,4 +27,3 @@ from collections import Counter
 # - pyvista: 3D structure rendering and isosurfaces
 # - re: parsing text in XYZ/LAMMPS file headers
 # - defaultdict: convenient dictionary defaults for counters and maps
-
