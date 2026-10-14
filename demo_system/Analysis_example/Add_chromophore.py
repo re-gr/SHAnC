@@ -3,11 +3,11 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from Construction.import_libraries import *
-from Construction.distortion import *
-from Construction.analysis import *
-from Construction.read_write import *
-from Construction.add_chromophore import *
+from construction.import_libraries import *
+from construction.distortion import *
+from construction.analysis import *
+from construction.read_write import *
+from construction.add_chromophore import *
 
 ### SiO2 ###
 target_folder = 'sio2_pitch_200'
@@ -98,19 +98,19 @@ print(surface_area_nm2)
     ) = graft_molecules(
     Pos, Types, list_BOX, Pos_contour, Types_contour,
     surface_area_nm2, mol_file, type_map, density_nm2,
-    
+
     d_surface        = 1.7219,
     d_mol_surface    = 2.0,
     d_mol_mol        = 3.0,
     neighbor_cutoff  = 10.0,
-    
+
     Si_type          = 1,
     Si_coordination  = 3,
-   
+
     use_OH_sites     = True,
     OH_types         = (3, 4),
     OH_bond_cutoff   = 2.0,
-    
+
     use_O_triangle_sites  = False,
     O_triangle_type       = 2,
     O_triangle_radius     = 100.0,
@@ -187,8 +187,3 @@ plotter.add_mesh(mesh_mol, color=[255, 0, 0], opacity = 1.0)
 mesh_N = pv.PolyData(updated_anchor_pos).glyph(scale = False, geom = sphere2)
 plotter.add_mesh(mesh_N, color='green', opacity = 1.0)
 plotter.show()
-
-
-
-
-
