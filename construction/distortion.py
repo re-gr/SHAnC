@@ -641,8 +641,8 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
         # can be applied while preserving only the interior after capping.
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx, Ny, 3, Lims, Atom_types, Atom_pos)
         Pos, Types, Bonds_OH, _ = clean_structure(Pos, Types, Lims, N_list, periodic=True)
-        Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1, 1, Nz, Lims, Types, Pos, Bonds_OH=Bonds_OH, Angles_OH=Angles_OH)
         Angles_OH = []
+        Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1, 1, Nz, Lims, Types, Pos, Bonds_OH=Bonds_OH, Angles_OH=Angles_OH)
 
         # Adapt the pitch to the new z dimension to avoid problems with the periodicity of the system after the transformation
         pitch_actual = Nz*lz
@@ -683,7 +683,7 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
         # Transformation of the cuboid into the helice
         Pos_transfo,Lims_tot = transfo(Pos, Types, Lims, mass_map, metal = metal, D=D_transfo,rota=rota,do_periodic=do_periodic,params_helix=[pitch,width,thickness])
         import pyvista as pv
-        pv.global_theme.jupyter_backend = "None"
+        #pv.global_theme.jupyter_backend = "None"
         visualize_structure(Pos_transfo, Types)
 
         # Map original slab atoms to the transformed cast and surface partitions.
