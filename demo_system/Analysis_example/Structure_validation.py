@@ -3,10 +3,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from Construction.import_libraries import *
-from Construction.distortion import *
-from Construction.analysis import *
-from Construction.read_write import *
+from construction.import_libraries import *
+from construction.distortion import *
+from construction.analysis import *
+from construction.read_write import *
 
 ### SiO2 ###
 target_folder = 'sio2_pitch_200'
@@ -18,7 +18,7 @@ print("Entering target folder", target_folder)
 file = "last_timestep.lammpstrj"
 list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
 
-# Analyze data file 
+# Analyze data file
 list_TSTEP=[0]
 list_Pos = list_ATOMS[:,:,2:]
 list_Types = list_ATOMS[:,:,1]
@@ -54,7 +54,7 @@ print("Entering target folder", target_folder)
 file = "last_timestep.lammpstrj"
 list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file,unscale=True)
 
-# Analyze data file 
+# Analyze data file
 list_TSTEP=[0]
 list_Pos = list_ATOMS[:,:,2:]
 list_Types = list_ATOMS[:,:,1]
