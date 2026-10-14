@@ -18,7 +18,6 @@ SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used t
     - distorsion.py : old version of the script in construction that should be compatible with the other script
     - script\_launch.py : script to create the systems and input file for the simulations
 
-- Animation : scripts that were used to create animation for slides purposes
 
 ## Depedencies
 
@@ -31,5 +30,5 @@ SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used t
 ## Contact
 
 Email : [Rg](mailto:remi.grincourt@ens-lyon.fr)
-
+        [mate-pr](mailto:maewenn.temey@ens-lyon.fr)
 
