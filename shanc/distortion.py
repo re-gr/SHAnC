@@ -10,9 +10,8 @@ maintain bond and angle connectivity for OH-passivated surfaces.
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from construction.import_libraries import *
-from construction.read_write import *
-from construction.analysis import *
+from shanc.read_write import *
+from shanc.analysis import *
 
 # distortion.py contains tools to duplicate lattice slabs, clean oxide surfaces,
 # transform a slab into a helical geometry, and generate full periodic systems
@@ -490,7 +489,7 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
     create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False)
 
     This functions creates the whole system using the dimensions stated.
-    It creates two files : quartz_dupl.data and quartz_int.data which contains the data of the surface and the data of the cast respectively.
+    It creates two files : by default quartz_dupl.data and quartz_int.data which contains the data of the surface and the data of the cast respectively.
 
     Parameters
     ----------
@@ -523,18 +522,18 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
             The position of the atoms of the surface
         Types : list
             The type of the atoms of the surface
-        Lims_tot : list
-            The lims of the surface
+        Lims : list
+            The limits of the surface
         Angles_OH : list
             The angles SiOH
-        Pos_transfo_int : list
+        Pos_transfo_cast : list
             The position of the atoms of the interior
-        Types_int : list
+        Types_cast : list
             The type of the atoms of the interior
-        Lims_tot_int : list
-            The lims of the interior
+        Lims_cast : list
+            The limits of the interior
 
-        Two files are also created : quartz_dupl.data and quartz_int.data
+        Two files are also created : quartz_dupl.data and quartz_int.data by default
     """
 
     use_cast = True
@@ -682,7 +681,7 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
 
         # Transformation of the cuboid into the helice
         Pos_transfo,Lims_tot = transfo(Pos, Types, Lims, mass_map, metal = metal, D=D_transfo,rota=rota,do_periodic=do_periodic,params_helix=[pitch,width,thickness])
-        import pyvista as pv
+        # import pyvista as pv
         #pv.global_theme.jupyter_backend = "None"
         visualize_structure(Pos_transfo, Types)
 

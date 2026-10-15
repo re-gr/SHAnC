@@ -3,10 +3,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from construction.import_libraries import *
-from construction.distortion import *
-from construction.analysis import *
-from construction.read_write import *
+from shanc.import_libraries import *
+from shanc.distortion import *
+from shanc.analysis import *
+from shanc.read_write import *
 
 
 # ---------------------------------------------------------------------------

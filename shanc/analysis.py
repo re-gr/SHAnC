@@ -17,8 +17,7 @@ Dependencies:
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from construction.import_libraries import *
-from construction.read_write import *
+from shanc.read_write import *
 
 
 # ---------------------------------------------------------------------------
@@ -1007,8 +1006,19 @@ def compute_quick_surface(Pos, grid, Lims, alpha=2, prec=20, d=10,
 
     return cube
 
+class test(object):
+    def __init__(self):
+        return
+    def a(self):
+        print("BONJOUR")
 
-def analyze_defects(Pos, Types, periodic=False, Lims=[],
+        plotter = pv.Plotter()
+        mesh = pv.Sphere()
+        plotter.add_mesh(mesh)
+        plotter.show()
+
+
+def plot_analyze_defects(Pos, Types, periodic=False, Lims=[],
                     Cycles=None, L_cycles=None,
                     d_spacing=5, isovalue=1., alpha=2., prec=20,
                     d=10, length_box=20, smoothing=1000, N_th=8,
@@ -1073,6 +1083,7 @@ def analyze_defects(Pos, Types, periodic=False, Lims=[],
         smooth  = contour.smooth(n_iter=int(smoothing)) if smoothing else contour
         plotter.add_mesh(smooth, opacity=0.1, color="red", name="contour")
         plotter.show()
+
 
 
 def analyze_density(Pos, periodic=False, Lims=[],

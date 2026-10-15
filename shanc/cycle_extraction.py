@@ -9,8 +9,7 @@ import os, sys
 import networkx as nx
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from construction.import_libraries import *
-from construction.analysis import *
+from shanc.analysis import *
 
 
 # ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ Functions include:
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from construction.import_libraries import *
+from shanc.import_libraries import *
 
 
 # ---------------------------------------------------------------------------
