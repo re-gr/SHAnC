@@ -17,6 +17,8 @@ from shanc.distortion import *
 from shanc.read_write import *
 from shanc.analysis import *
 from scipy.spatial import cKDTree
+import numpy as np
+import matplotlib.pyplot as plt
 
 BOND_TYPE_MAP = {
     (frozenset({'C', 'H'}), 1): 1,

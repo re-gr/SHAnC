@@ -11,6 +11,8 @@ Functions include:
     plus auxiliary format parsers for type map and box information.
 """
 
+import numpy as np
+import re
 from scipy.spatial.distance import cdist
 from shanc.helix_object import *
 # ---------------------------------------------------------------------------
@@ -31,6 +33,38 @@ ELEMENT_MASSES = {
     "Pt":195.084,   "Au":196.967,   "Pb":207.2,
 }
 
+ELEMENT_AT_NUM = {
+      1 : "H",       2 : "He",      3 : "Li",      4 : "Be",
+      5 : "B",       6 : "C",       7 : "N",       8 : "O" ,
+      9 : "F",      10 : "Ne",     11 : "Na",     12 : "Mg",
+     13 : "Al",     14 : "Si",     15 : "P",      16 : "S" ,
+     17 : "Cl",     18 : "Ar",     19 : "K",      20 : "Ca",
+     21 : "Sc",     22 : "Ti",     23 : "V",      24 : "Cr",
+     25 : "Mn",     26 : "Fe",     27 : "Co",     28 : "Ni",
+     29 : "Cu",     30 : "Zn",     31 : "Ga",     32 : "Ge",
+     33 : "As",     34 : "Se",     35 : "Br",     36 : "Kr",
+     37 : "Rb",     38 : "Sr",     39 : "Y",      40 : "Zr",
+     41 : "Nb",     42 : "Mo",     43 : "Tc",     44 : "Ru",
+     45 : "Rh",     46 : "Pd",     47 : "Ag",     48 : "Cd",
+     49 : "In",     50 : "Sn",     51 : "Sb",     52 : "Te",
+     53 : "I",      54 : "Xe",     55 : "Cs",     56 : "Ba",
+     57 : "La",     58 : "Ce",     59 : "Pr",     60 : "Nd",
+     61 : "Pm",     62 : "Sm",     63 : "Eu",     64 : "Gd",
+     65 : "Tb",     66 : "Dy",     67 : "Ho",     68 : "Er",
+     69 : "Tm",     70 : "Yb",     71 : "Lu",     72 : "Hf",
+     73 : "Ta",     74 : "W",      75 : "Re",     76 : "Os",
+     77 : "Ir",     78 : "Pt",     79 : "Au",     80 : "Hg",
+     81 : "Tl",     82 : "Pb",     83 : "Bi",     84 : "Po",
+     85 : "At",     86 : "Rn",     87 : "Fr",     88 : "Ra",
+     89 : "Ac",     90 : "Th",     91 : "Pa",     92 : "U" ,
+     93 : "Np",     94 : "Pu",     95 : "Am",     96 : "Cm",
+     97 : "Bk",     98 : "Cf",     99 : "Es",    100 : "Fm",
+    101 : "Md",    102 : "No",    103 : "Lr",    104 : "Rf",
+    105 : "Db",    106 : "Sg",    107 : "Bh",    108 : "Hs",
+    109 : "Mt",    110 : "Ds",    111 : "Rg",    112 : "Cn",
+    113 : "Nh",    114 : "Fl",    115 : "Mc",    116 : "Lv",
+    117 : "Ts",    118 : "Og"}
+
 def _mass_to_symbol_map(mass_map):
     """
     Build {type_id: element_symbol} from a {type_id: mass} dict by finding
@@ -48,16 +82,28 @@ def _mass_to_symbol_map(mass_map):
     return symbol_map
 
 
+def _symbol_to_mass_map(symbol_map):
+    """
+    Build the mass map from a symbol map
+    """
+    mass_map = {}
+    for type in symbol_map:
+        symbol = symbol_map[type]
+        mass = ELEMENT_MASSES[symbol]
+        mass_map[type] = mass
 
-
-
-
-
+    return mass_map
 
 
 ##### ------- XYZ files ------- #####
 
 def read_xyz(file_name, type_map=None, metal=False):
+    """
+    read_xyz files
+    """
+
+
+
     with open(file_name, "r") as f:
         lines = f.readlines()
 
@@ -65,6 +111,7 @@ def read_xyz(file_name, type_map=None, metal=False):
     list_NUM_AT = []
     list_BOX = []
     list_ATOMS = []
+    list_TYPE_MAPS = []
 
     auto_type_map = {} if type_map is None else dict(type_map)
     next_type_id = max(auto_type_map.values(), default=0) + 1
@@ -107,6 +154,9 @@ def read_xyz(file_name, type_map=None, metal=False):
         # ---- read atoms always store raw coords here ----
         atoms     = []
         positions = []
+
+        #store dict type to atom
+        type_map = {}
         for j in range(num_at):
             ls   = lines[i + 2 + j].split()
             elem = ls[0]
@@ -114,7 +164,13 @@ def read_xyz(file_name, type_map=None, metal=False):
 
             if elem not in auto_type_map:
                 auto_type_map[elem] = next_type_id
+                #add mapping type to symbol
+                if type(elem) is int:
+                    type_map[next_type_id] = ELEMENT_AT_NUM[elem]
+                else: type_map[next_type_id] = elem
+
                 next_type_id += 1
+
             type_at = auto_type_map[elem]
 
             atoms.append([j + 1, type_at, x, y, z])   # always raw
@@ -146,7 +202,7 @@ def read_xyz(file_name, type_map=None, metal=False):
                 # The XYZ contains atoms at x=0 AND x=a (same for y, z).
                 # When tiling, cell k's top face = cell k+1's bottom face â†’ duplicates.
                 # Keeping only the half-open cell [0, a) fixes this at the source.
-                tol = 1e-3  # Ã… â€” robust against floating point
+                tol = 1e-3  # robust against floating point
                 atoms_clean = []
                 for atom in atoms:
                     x, y, z = atom[2], atom[3], atom[4]
@@ -156,7 +212,7 @@ def read_xyz(file_name, type_map=None, metal=False):
 
                 n_removed = len(atoms) - len(atoms_clean)
                 print(f"Metal half-open cell: removed {n_removed} top-face atoms "
-                      f"(a={a:.4f} Ã…, d_NN={d_NN:.4f} Ã…)")
+                      f"(a={a:.4f} A…, d_NN={d_NN:.4f} A…)")
                 print(f"  Unit cell: {len(atoms_clean)} atoms (was {len(atoms)})")
                 atoms = atoms_clean
                 num_at = len(atoms_clean)
@@ -167,9 +223,10 @@ def read_xyz(file_name, type_map=None, metal=False):
         list_NUM_AT.append(num_at)
         list_BOX.append(box)
         list_ATOMS.append(atoms)
+        list_TYPE_MAPS.append(type_map)
         i += 2 + n_lines_to_skip
 
-    return list_TSTEP, list_NUM_AT, list_BOX, np.array(list_ATOMS)  # list, not np.array
+    return list_TSTEP, list_NUM_AT, list_BOX, np.array(list_ATOMS), list_TYPE_MAPS
 
 
 def write_xyz(file_out, list_TSTEP, list_BOX, list_ATOMS, symbol_map, last_only=False):
@@ -322,16 +379,9 @@ def write_dump(file_name, list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS):
 
 ##### -------- Data files -------- #####
 
-def read_data(file, do_scale=True, atom_style="full"):
+def read_data(file, do_scale=True, atom_style="atom"):
     """
-    Read a LAMMPS data file.
-
-    atom_style="full"  → returns (list_BOX, np.array(list_ATOMS))
-                          columns: id  type  x  y  z  (scaled if do_scale=True)
-    atom_style="atom"  → returns (Lims, Atom_types, Atom_pos)
-                          Box is inferred from positions when not present in file.
-
-    Returns also mass_map {type_id: mass} as last element when atom_style="atom".
+    read_data(file,do_scale=True,atom_style="atom")
     """
 
     if atom_style == "full":
@@ -501,6 +551,7 @@ def write_data(file_name, Pos, Types, Lims,
                 effective_mass[int(tokens[0])] = float(tokens[1])
             except (ValueError, IndexError):
                 pass
+
 
     if mass_map is not None:
         effective_mass.update(mass_map)
@@ -899,18 +950,51 @@ def convert_xyz_to_data(file, type_map=None, mass_map=None, metal=False,
 
 
 
-def read_structure_from_data(data_file, do_scale=True, atom_style="full"):
+def read_structure_from_file(file, do_scale=True, atom_style="full"):
     """
-    read_structure_from_data(data_file, do_scale=True, atom_style="full")
+    read_structure_from_data(file, do_scale=True, atom_style="full")
 
-    This functions reads a structure from a lammps data file.
-    This in turn can be used to create an helix
+    This function tries to read a structure file from a file.
+    The format of the file should be .data, .xyz or a dump file
 
+    """
+    format = file.split(".")[-1]
+    if format == "data":
+        Lims, Atom_types, Atom_pos, mass_map = read_data(file, do_scale=do_scale, atom_style=atom_style)
+        type_map = _mass_to_symbol_map(mass_map)
+
+    elif format == "xyz":
+        list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS, list_TYPE_MAP = read_xyz(file, type_map=None, metal=False)
+        Lims = list_BOX[-1]
+        Atoms_last_step = list_ATOMS[-1]
+        Atom_types = Atoms_last_step[:,1]
+        Atom_pos = Atoms_last_step[:,2:]
+        type_map = list_TYPE_MAP[-1]
+        mass_map = _symbol_to_mass_map(type_map)
+
+    else:
+        list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(dump_file, unscale=False)
+        Lims = list_BOX[-1]
+        Atoms_last_step = list_ATOMS[-1]
+        Atom_types = Atoms_last_step[:,1]
+        Atom_pos = Atoms_last_step[:,2:]
+        print("System extracted from a dump file, no symbol mapping are done. If one wants it to be done, one should use....")
+        mass_map = {}
+        type_map = {}
+
+    return Atom_pos, Atom_types, Lims, mass_map, type_map
+
+
+def create_helix_from_file(file, do_scale=True, atom_style="full"):
+    """
+    read_structure_from_data(file, do_scale=True, atom_style="full")
+
+    This function tries to read a structure file from a file.
+    The format of the file should be .data, .xyz or .lmmpstrj
+
+    SHould be used to display after dynamics
 
     """
 
-    Lims, Atom_types, Atom_pos, type_atom_map = read_data(file, do_scale=do_scale, atom_style=atom_style)
 
-    helix = shanc.helix()
-
-    return helix
+    return

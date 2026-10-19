@@ -16,8 +16,13 @@ Dependencies:
 """
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+import numpy as np
+import scipy.spatial.distance as sd
 from shanc.read_write import *
+import matplotlib.pyplot as plt
+import pyvista as pv
+from shanc.helix_object import *
+from scipy.spatial import KDTree
 
 
 # ---------------------------------------------------------------------------
@@ -1006,17 +1011,6 @@ def compute_quick_surface(Pos, grid, Lims, alpha=2, prec=20, d=10,
 
     return cube
 
-class test(object):
-    def __init__(self):
-        return
-    def a(self):
-        print("BONJOUR")
-
-        plotter = pv.Plotter()
-        mesh = pv.Sphere()
-        plotter.add_mesh(mesh)
-        plotter.show()
-
 
 def plot_analyze_defects(Pos, Types, periodic=False, Lims=[],
                     Cycles=None, L_cycles=None,
@@ -1134,7 +1128,7 @@ def analyze_density(Pos, periodic=False, Lims=[],
 # Visualisation – interactive slice viewer
 # ---------------------------------------------------------------------------
 
-def analyze_plot_syst(Pos, Types, periodic=False, Lims=[],
+def analyze_plot_syst(self,
                       draw_limit=5, compute_limit=7,
                       Cycles=None, L_cycles=None,
                       cation_type=1, anion_type=2):
@@ -1153,6 +1147,12 @@ def analyze_plot_syst(Pos, Types, periodic=False, Lims=[],
     cation_type    : int   – type id of the cation, default 1
     anion_type     : int   – type id of the anion,  default 2
     """
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+    periodic = self.periodic
+
     def slide(value):
         if periodic:
             L = Lims[2][1]
@@ -1224,6 +1224,7 @@ def analyze_plot_syst(Pos, Types, periodic=False, Lims=[],
                               title="Pos", fmt="%3.3e")
     plotter.show()
 
+helix.analyze_plot_syst = analyze_plot_syst
 
 # ---------------------------------------------------------------------------
 # Visualisation – atom rendering
@@ -1264,9 +1265,9 @@ def validate_unit_cell(Atom_pos, Atom_types, Lims,
     return all_ok
 
 
-def visualize_structure(Pos, Types, Lims=None, point_size=12, type_colors=None,
+def plot_structure_quick(self, point_size=12, type_colors=None,
                         sphere=True, parallel_proj=True,
-                        draw_bonds=False, max_bond_dist=2.0):
+                        draw_bonds=True, max_bond_dist=2.0):
     """Render the atomic structure in 3D using PyVista.
 
     Parameters
@@ -1290,6 +1291,10 @@ def visualize_structure(Pos, Types, Lims=None, point_size=12, type_colors=None,
     max_bond_dist : float, optional
         Distance cutoff used for bond drawing.
     """
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+
     if type_colors is None:
         type_colors = {1: 'gold', 2: 'red', 3: 'blue', 4: [255, 255, 0]}
 
@@ -1302,7 +1307,7 @@ def visualize_structure(Pos, Types, Lims=None, point_size=12, type_colors=None,
             continue
         if sphere:
             geom = pv.Sphere(radius=radii.get(t, 0.5))
-            mesh = pv.PolyData(Pos[mask].astype(float)).glyph(scale=False, geom=geom)
+            mesh = pv.PolyData(Pos[mask].astype(float)).glyph(scale=False, geom=geom, orient=False)
         else:
             mesh = pv.PolyData(Pos[mask].astype(float))
         plotter.add_mesh(mesh, color=color, lighting=False)
@@ -1326,6 +1331,7 @@ def visualize_structure(Pos, Types, Lims=None, point_size=12, type_colors=None,
         plotter.enable_parallel_projection()
     plotter.show()
 
+helix.plot_structure_quick = plot_structure_quick
 
 def visualize_structure_cast_surface_separation(Pos, Types, Lims=None, point_size=12,
                                                 type_colors=None, sphere=True,

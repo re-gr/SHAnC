@@ -10,6 +10,9 @@ maintain bond and angle connectivity for OH-passivated surfaces.
 import os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import numpy as np
+import scipy.spatial.distance as sd
+
 from shanc.read_write import *
 from shanc.analysis import *
 from shanc.helix_object import *
@@ -225,7 +228,7 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
                         expected_coord=4,
                         bond_threshold=2.0,
                         bond_length=1.6, h_length=1.0,
-                        collision_tol=0.8, min_count = None):
+                        collision_tol=0.8, min_count = None, cap_max_coord=None, cap_missing=2):
     """metal
     Cleans the surface of an oxide slab by adding OH groups to under-
     coordinated cations, generalised to any cation type.
@@ -424,7 +427,7 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
 # Geometric Helical transformation
 # ---------------------------------------------------------------------------
 
-def transfo(Pos,Types,Lims,mass_map, mean = None,D=0,rota=0,enlarge=10, periodic=True,other_mapping=False,params_helix=[]):
+def transfo(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10, enlarge_z=0, periodic=True,other_mapping=False,params_helix=[]):
     """
     transfo(Pos,D=0,rota=0,enlarge=10,periodic=True,circling=True,do_rota_transf=False)
 
@@ -453,7 +456,9 @@ def transfo(Pos,Types,Lims,mass_map, mean = None,D=0,rota=0,enlarge=10, periodic
         Pos_transfo : The transformed positions
         Lims : the limits of the new system
     """
-    enlarge_z = Lims[2] - np.max(Pos[:,2])
+
+
+
 
     mean = np.mean(Pos,axis=0)
     mean[2] = np.min(Pos[:,2])
@@ -534,11 +539,11 @@ def transfo(Pos,Types,Lims,mass_map, mean = None,D=0,rota=0,enlarge=10, periodic
 # ---------------------------------------------------------------------------
 
 def create_helix(self,
-                file_duplicate="beta_quartz.data",file_output = "quartz_dupl.data",
-                file_output_cast = "quartz_int.data", mass_map = {1: 28.0855, 2: 15.9994, 3: 15.9994, 4: 1.0080},  cap_missing=2):
+                file_lattice="", output_name = "helix.data",
+                output_name_cast = "helix_cast.data", mass_map = {},  cap_missing=2):
 
     """
-    create_syst(rota,D,pitch,width,thickness,int_thick,clean_structure=True,periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False)
+    create_syst(rota,D,pitch,width,thickness,int_thick,clean_structure=True,periodic=True,circling=True,do_rota_transf=False,file_lattice="beta_quartz.data",do_angles=False)
 
     This functions creates the whole system using the dimensions stated.
     It creates two files : by default quartz_dupl.data and quartz_int.data which contains the data of the surface and the data of the cast respectively.
@@ -563,7 +568,7 @@ def create_helix(self,
             Circle the basis of the cuboid. This should be used to create helices as is gives much better curvatures. By default True
         do_rota_transf : bool, optional,
             Use the rota transformation instead of the helix one. This should not be used as it gives much worse structure. By default False
-        file_duplicate : float, optional,
+        file_lattice : float, optional,
             the file containing the lattice that will be duplicated
         do_angles : bool, optional
             write the angles SiOH
@@ -576,34 +581,50 @@ def create_helix(self,
         Two files are also created : quartz_dupl.data and quartz_int.data by default
     """
 
-    #Get the values from the object
+    #the asymetric factor for the cast inside, maybe we should look into this
+    asym = 1
+
+
+    #Try to get the values from the object
+
     rota = self.turns
     diameter = self.diameter
     pitch = self.pitch
     width = self.width
     thickness = self.thickness
     int_thick = self.int_thick
-    Twist = self.Twist
+    twist = self.twist
     saturation = self.saturation
     periodic = self.periodic
 
-    asym = 1
+    if mass_map == {}:
+        mass_map = self.mass_map
+        if mass_map == {}:
+            raise SyntaxError("Missing mass_map, try adding it when defining your helix, or put it as an argument of this function.")
+    else:
+        self.mass_map = mass_map
 
 
-    use_cast = True
-    Lims, Atom_types, Atom_pos, _ = read_data(file_duplicate,do_scale=False,atom_style="atom")
-    print("Read :", file_duplicate)
+    if file_lattice != "":
+        self.read_lattice(file_lattice)
+
+    Pos_lattice = self.Pos_lattice
+    Types_lattice = self.Types_lattice
+    Lims_lattice = self.Lims_lattice
+    if (self.file_lattice.split("."))[-1] == "xyz":
+        print("/!\\ Warning, you are trying to create an helix starting from a xyz file. This is not recommended as they don't contain the information of the cubic cell. A box was infered but could be wrong...")
 
 
-    Lims_visu = [[np.max(Atom_pos[:,0]), np.min(Atom_pos[:,0])], [np.max(Atom_pos[:,1]), np.min(Atom_pos[:,1])], [np.max(Atom_pos[:,2]), np.min(Atom_pos[:,2])]]
+
+    Lims_visu = [[np.max(Pos_lattice[:,0]), np.min(Pos_lattice[:,0])], [np.max(Pos_lattice[:,1]), np.min(Pos_lattice[:,1])], [np.max(Pos_lattice[:,2]), np.min(Pos_lattice[:,2])]]
     print("First RDF check on the FCC")
 
-    # visualize_cuboid(Atom_pos, Atom_types, Lims_visu)
+    # visualize_cuboid(Pos_lattice, Types_lattice, Lims_visu)
 
     # Get the number of duplication needed to get the proper dimensions
-    lx = Lims[0][1] - Lims[0][0]
-    ly = Lims[1][1] - Lims[1][0]
-    lz = Lims[2][1] - Lims[2][0]
+    lx = Lims_lattice[0][1] - Lims_lattice[0][0]
+    ly = Lims_lattice[1][1] - Lims_lattice[1][0]
+    lz = Lims_lattice[2][1] - Lims_lattice[2][0]
 
     Nx = int(width // lx +1)
     Ny = int(thickness // ly +1)
@@ -631,6 +652,7 @@ def create_helix(self,
 
     N_list = np.array([[Nx],[Ny],[Nz]])
 
+    use_cast = True
     if int_thick == 0:
         use_cast = False
         Nx_list = Nx
@@ -639,8 +661,8 @@ def create_helix(self,
     print(Nx_list,Ny_list,Nz)
 
 
-    Atom_pos[:,2] += lz/4
-    Atom_pos[:, 2] %= lz
+    Pos_lattice[:,2] += lz/4
+    Pos_lattice[:, 2] %= lz
 
     supercell_Lx = Nx*lx
     supercell_Ly = Ny*ly
@@ -658,7 +680,7 @@ def create_helix(self,
     T = thickness
 
 
-    D_est = (-T+D_exp) /2
+    D_est = (-T+diameter) /2
     N = P / (P*P + D_est*D_est)**(1/2)
     b = abs(2*T*D_est / (W*W*N*N - T*T))
     # print(b)
@@ -668,9 +690,9 @@ def create_helix(self,
         D_transfo = D_est
     else:
         # The extremum is in-between
-        d0 = (W*W/4 - D_exp**2/4) * P**4 * (W*W-T*T)
-        d2 = (P*P*D_exp**2/4 * (T*T-W*W) + P*P*T*T * (D_exp**2/4-W*W/4)) + P**4*W*W
-        d4 = (D_exp**2/4 *T*T + W*W*P*P)
+        d0 = (W*W/4 - diameter**2/4) * P**4 * (W*W-T*T)
+        d2 = (P*P*diameter**2/4 * (T*T-W*W) + P*P*T*T * (diameter**2/4-W*W/4)) + P**4*W*W
+        d4 = (diameter**2/4 *T*T + W*W*P*P)
         delta = (d2**2 - 4*d4*d0)
         if delta > d2**2:
             D_transfo = ((-d2 + delta**(1/2))/2/d4)**(1/2)
@@ -685,36 +707,43 @@ def create_helix(self,
     if D_transfo < 0:
         D_transfo = 0
 
-    if Twist:
+    if twist:
         D_transfo = 0
-    print("Old D", D_transfo, D_exp)
+    print("Old D", D_transfo, diameter)
 
     ##Surface
     if saturation:
         ## For oxydes --> need to "clean" the structure with OH bonds
         # Create one slab that is corrected then duplicated Nz times
         # The slab contains 3 duplicates as to only take the inside when doing the cleaning
-        Pos, Types, Lims_tot, _a, _b = duplicate(Nx,Ny,3,Lims,Atom_types,Atom_pos)
+        Pos, Types, Lims_tot, _a, _b = duplicate(Nx,Ny,3,Lims_lattice,Types_lattice,Pos_lattice)
         # visualize_cuboid(Pos, Types)
-        Pos, Types, Bonds_OH, _ = clean_structure(Pos, Types, Lims, N_list, periodic=True, cap_missing=cap_missing)
+        Pos, Types, Bonds_OH, _ = clean_structure(Pos, Types, Lims_lattice, N_list, periodic=True, cap_missing=cap_missing)
         # visualize_cuboid(Pos, Types)
-        Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1,1,Nz,Lims,Types,Pos,Bonds_OH=Bonds_OH)
+        Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1,1,Nz,Lims_lattice,Types,Pos,Bonds_OH=Bonds_OH)
 
         # Adapt the pitch to the new z dimension to avoid problems with the periodicity of the system after the transformation
-        pitch_actual = Nz*lz
-        Pos[:,2] *=pitch/pitch_actual
-        Lims_tot[2] *=pitch/pitch_actual
+        # ############
+        #### This should not be an issue / I don't think we should do that actually!! It might contrain more the system for big helices
+        ## I will look into the periodicity problem
+        ## It should come from the enlarge_z which was specific to the silica, it should be corrected now
+        # ###########
+
+        # pitch_actual = Nz*lz
+        # Pos[:,2] *= pitch/pitch_actual
+        # Lims_tot[2] *= pitch/pitch_actual
+
         # visualize_cuboid(Pos, Types, Lims_visu)
         # plot_rdf_type1type2(Pos, Types)
         write_data("cuboid.data", Pos, Types, Lims=Lims_tot, Bonds_OH=Bonds_OH, mass_map=mass_map)
 
     else:
         ## Create slab form which we remove the duplicate atoms ##
-        Pos, Types, Lims_tot, _a, _b = duplicate(Nx, Ny, Nz,Lims,Atom_types,Atom_pos)
+        Pos, Types, Lims_tot, _a, _b = duplicate(Nx, Ny, Nz,Lims_lattice,Types_lattice,Pos_lattice)
 
-        pitch_actual = Nz*lz
-        Pos[:,2] *=pitch/pitch_actual
-        Lims_tot[2] *=pitch/pitch_actual
+        # pitch_actual = Nz*lz
+        # Pos[:,2] *=pitch/pitch_actual
+        # Lims_tot[2] *=pitch/pitch_actual
 
 
         # visualize_cuboid(Pos, Types, Lims_visu)
@@ -732,14 +761,16 @@ def create_helix(self,
         print("Separation between helix wall and cast is", int_thick, "Angstrom")
         # Mask to separate the surface and the cast later
         ## Need elliptical mapping for this ##
-        mask_int_x = (((Pos[:,0] - Lims[0][0])//lx >= Nx_list[1]) & ((Pos[:,0] - Lims[0][0])//lx < Nx_list[2]))
-        mask_int_y = (((Pos[:,1] - Lims[1][0])//ly >= Ny_list[1]) & ((Pos[:,1] - Lims[1][0])//ly < Ny_list[2]))
+        mask_int_x = (((Pos[:,0] - Lims_lattice[0][0])//lx >= Nx_list[1]) & ((Pos[:,0] - Lims_lattice[0][0])//lx < Nx_list[2]))
+        mask_int_y = (((Pos[:,1] - Lims_lattice[1][0])//ly >= Ny_list[1]) & ((Pos[:,1] - Lims_lattice[1][0])//ly < Ny_list[2]))
 
         mask_int = mask_int_x & mask_int_y
         mask_surf = ~mask_int
 
-        # Transformation of the cuboid into the helice
-        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims, mass_map, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness])
+        enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
+        # Transformation of the cuboid into the helix
+        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
+
 
         from scipy.spatial import cKDTree
         # pairs = cKDTree(Pos).query_pairs(2.6, output_type='ndarray')
@@ -802,7 +833,6 @@ def create_helix(self,
 
             delta = Pos_transfo_surf[a2 - 1,2] - Pos_transfo_surf[a1 - 1, 2]
             delta -= Lz*np.round(delta/Lz)
-            dmin = np.linalg.norm(delta)
             if d > 10: # Check if bond too large
                 dz = Pos_transfo_surf[a2 - 1, 2] - Pos_transfo_surf[a1 - 1, 2]
                 print(dz, Lz/2)
@@ -815,7 +845,7 @@ def create_helix(self,
 
         # Write data files
         if Pos_transfo_surf.size > 0:
-            write_data(file_output,Pos_transfo_surf,Types_surf,Lims_tot,Bonds_OH=new_bond_surf,Angles_OH=Angles_OH, mass_map=mass_map)
+            write_data(output_name,Pos_transfo_surf,Types_surf,Lims_tot,Bonds_OH=new_bond_surf,Angles_OH=Angles_OH, mass_map=mass_map)
         else:
             print("Surface is empty")
 
@@ -825,24 +855,33 @@ def create_helix(self,
         print("Ti:", nTi, "O(2+3):", nO, "H:", nH)
         print("O excess vs 2*Ti:", nO - 2*nTi, " (should equal number of added OH, A)")
 
-        write_data(file_output_cast,Pos_transfo_int,Types_int,Lims_tot,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH, mass_map=mass_map)
+        write_data(output_name_cast,Pos_transfo_int,Types_int,Lims_tot,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH, mass_map=mass_map)
 
     ## If we don't add a cast to relax against ##
     else:
         Angles_OH = []
         print("No cast added, the helix is full")
-        ## Transformation of the cuboid into the helice ##
-        Pos_transfo,Lims_tot = transfo(Pos,Types, Lims_tot, mass_map, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness])
+
+        enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
+        ## Transformation of the cuboid into the helix ##
+        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
         Pos_transfo_int = []
         Types_int = []
         Pos_transfo_surf, Types_surf = Pos_transfo, Types
 
         # visualize_cuboid(Pos_transfo_surf, Types_surf)
-        write_data(file_output, Pos_transfo_surf, Types_surf, Lims_tot,
+        write_data(output_name, Pos_transfo_surf, Types_surf, Lims_tot,
                 Bonds_OH=Bonds_OH, Angles_OH=Angles_OH, mass_map=mass_map)
 
-    helix = shanc.helix(Pos_transfo_surf, Types_surf, Lims_tot, Bonds_OH, Angles_OH, Pos_transfo_int, Types_int, Lims_tot)
-    return helix
+
+    self.Pos = Pos_transfo_surf
+    self.Types = Types_surf
+    self.Lims = Lims_tot
+    self.Bonds = Bonds_OH
+    self.Angles = Angles_OH
+    self.Pos_cast = Pos_transfo_int
+    self.Types_cast = Types_int
+    self.Lims_cast = Lims_tot
 
 
 helix.create_helix = create_helix

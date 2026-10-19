@@ -3,12 +3,15 @@ Helix object definition for SHAnC
 """
 
 
-class helix(object):
+from shanc.read_write import *
+
+
+class helix:
     """
     Helix object
     """
 
-    def __init__(self, pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1):
+    def __init__(self, pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = ""):
         """
         helix(pitch, width, thickness, diameter, turns)
 
@@ -67,7 +70,8 @@ class helix(object):
         self.Lims = []
         self.Bonds = []
         self.Angles = []
-        self.type_atom_map = {}
+        self.type_map = {}
+        self.mass_map = {}
 
         #Values cast
         self.cast = False
@@ -76,6 +80,11 @@ class helix(object):
         self.Types_cast = []
         self.Lims_cast = []
 
+        #Values lattice
+        self.Pos_lattice = []
+        self.Types_lattice = []
+        self.Lims_lattice = []
+
         #Values Twist
         self.twist = False
 
@@ -83,6 +92,21 @@ class helix(object):
         self.saturation = True
 
         self.periodic = True
+
+        self.file_lattice = file_lattice
+        Atom_pos, Atom_types, Lims, mass_map, type_map = read_structure_from_file(file_lattice, do_scale=True, atom_style="atom")
+        if file_lattice != "":
+            try:
+                Atom_pos, Atom_types, Lims, mass_map, type_map = read_structure_from_file(file_lattice, do_scale=True, atom_style="atom")
+                self.Pos_lattice = Atom_pos
+                self.Types_lattice = Atom_types
+                self.Lims_lattice = Lims
+                self.type_map = type_map
+                self.mass_map = mass_map
+
+            except:
+                print("Tried reading the lattice file but an unknown issue happened.")
+
 
     def set_parameters(self, pitch, width, thickness, diameter, turns):
         """
@@ -118,7 +142,8 @@ class helix(object):
         """
         set_cast(int_thick)
 
-        Convert the helix as to put a cast inside
+        Convert the helix as to put a cast inside.
+        If the thickness is put at 0 (or below), then no cast are made
 
         Parameters
         ----------
@@ -130,9 +155,10 @@ class helix(object):
             None
                 The values are stored inside the helix object
         """
-
-        self.cast = True
-        self.int_thick = int_thick
+        if int_thick > 0:
+            self.cast = True
+            self.int_thick = int_thick
+        else: self.castt = False
 
 
     def set_twist(self,twist):
@@ -184,3 +210,28 @@ class helix(object):
         """
 
         self.periodic = periodic
+
+    def set_lattice(self,Pos_lattice,Types_lattice,Lims_lattice):
+        """
+        set_lattice(Pos_lattice,Types_lattice,Lims_lattice)
+
+        Sets the parameters for the lattice
+        """
+        self.Pos_lattice = Pos_lattice
+        self.Types_lattice = Types_lattice
+        self.Lims_lattice = Lims_lattice
+
+
+    def read_lattice(self,file_lattice):
+        """
+        read_lattice(file_lattice)
+
+        reads a lattice file
+        """
+        self.file_lattice = file_lattice
+        Atom_pos, Atom_types, Lims, mass_map, type_map = read_structure_from_file(file_lattice, do_scale=True, atom_style="atom")
+        self.Pos_lattice = Atom_pos
+        self.Types_lattice = Atom_types
+        self.Lims_lattice = Lims
+        self.type_map = type_map
+        self.mass_map = mass_map
