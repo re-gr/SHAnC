@@ -12,8 +12,7 @@ transformations, and ``analysis.py`` for neighbor-count based surface
 validation.
 """
 import os, sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+import numpy as np
 from shanc.distortion import *
 from shanc.read_write import *
 from shanc.analysis import *

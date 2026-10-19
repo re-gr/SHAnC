@@ -18,11 +18,11 @@ import time
 from pathlib import Path
 from collections import Counter
 
-import construction.helix
-import construction.analysis
-import construction.read_write
-import construction.cycle_extraction
-import construction.add_chromophore
+from shanc.helix_object import *
+from shanc.analysis import *
+from shanc.read_write import *
+# import shanc.cycle_extraction
+from shanc.add_chromophore import *
 
 # Core numerical and geometry utilities
 # - numpy: array maths and reshaping

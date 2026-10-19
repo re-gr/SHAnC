@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from shanc.read_write import *
 from shanc.analysis import *
+from shanc.helix_object import *
 
 # distortion.py contains tools to duplicate lattice slabs, clean oxide surfaces,
 # transform a slab into a helical geometry, and generate full periodic systems
@@ -182,16 +183,63 @@ def _find_missing_bond_dir(bonded_vecs, sign_x_fallback):
     return missing / mag
 
 
+def _auto_cap_params(Pos, Types, Lims, cation_type, anion_type, cutoff_factor = 1.2, oo_factor = 0.6, cap_missing = 2):
+
+    Pos_Cat = Pos[Types == cation_type]
+    Pos_An = Pos[Types == anion_type]
+    D = sd.cdist(Pos_Cat, Pos_An)
+
+    z0, Lz_unit = Lims[2][0], Lims[2][1] - Lims[2][0]
+    mid_cat = (Pos_Cat[:,2] >= z0 + Lz_unit) & (Pos_Cat[:,2] < z0 + 2*Lz_unit)
+    mid_an = (Pos_An[:,2] >= z0 + Lz_unit) & (Pos_An[:,2] < z0 + 2*Lz_unit)
+
+    # 1. Bond threshold from nearest-neighbour distance
+    d_bulk = np.median(D[mid_cat].min(axis=1))
+    bond_threshold = cutoff_factor * d_bulk
+
+    # 2. Bulk coordination
+    counts = np.sum(D < bond_threshold, axis = 1)
+    vals, n = np.unique(counts[mid_cat], return_counts=True)
+    bulk_coord = int(vals[np.argmax(n)])
+
+    # 3. Bond length from fully coordinated cations
+    full = mid_cat & (counts == bulk_coord)
+    d_full = D[full]
+    bond_length = float(d_full[d_full < bond_threshold].mean())
+
+    # 4. Collision tolerence from O_O nearest-neighbour distance
+    D_oo = sd.cdist(Pos_An[mid_an], Pos_An)
+    D_oo[D_oo < 1e-8] = np.inf
+    collision_tol = oo_factor * float(np.median(D_oo.min(axis=1)))
+    cap_max_coord = bulk_coord - cap_missing
+
+    return dict(bond_threshold=bond_threshold, expected_coord=bulk_coord,
+                bond_length=bond_length, collision_tol=collision_tol,
+                cap_max_coord = cap_max_coord)
+
+
+
+
 def clean_structure(Pos, Types, Lims, N, periodic=True,
                         cation_type=1, anion_type=2,
                         expected_coord=4,
                         bond_threshold=2.0,
                         bond_length=1.6, h_length=1.0,
                         collision_tol=0.8, min_count = None):
-    """
+    """metal
     Cleans the surface of an oxide slab by adding OH groups to under-
     coordinated cations, generalised to any cation type.
     """
+
+    auto = _auto_cap_params(Pos, Types, Lims, cation_type, anion_type, cap_missing = cap_missing)
+    print("cap missing:", cap_missing)
+    expected_coord = auto["expected_coord"] if expected_coord is None else expected_coord
+    bond_threshold = auto["bond_threshold"] if bond_threshold is None else bond_threshold
+    bond_length    = auto["bond_length"]    if bond_length    is None else bond_length
+    collision_tol  = auto["collision_tol"]  if collision_tol  is None else collision_tol
+    cap_max_coord  = auto["cap_max_coord"]  if cap_max_coord  is None else cap_max_coord
+
+
     oh_length = bond_length + h_length
     Center = [
     (Lims[0][1]*N[0][0] - Lims[0][0]) / 2,
@@ -220,7 +268,8 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
         return Pos, Types, [], []
 
 
-    Lack_Cat_mask = (Cat_count_An <= 2)
+    # Lack_Cat_mask = (Cat_count_An <= 2)
+    Lack_Cat_mask = (Cat_count_An <= cap_max_coord)
     Lack_Cat = Pos_Cat[Lack_Cat_mask]
     Lack_Cat_D_rows = D_all[Lack_Cat_mask]
 
@@ -235,6 +284,7 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
     Atoms_add_types = []
     Bonds_OH = []
     num_at = len(Pos)
+    partner_idx = []
     for Cat, D_row in zip(Lack_Cat, Lack_Cat_D_rows):
 
         sign_x = np.sign(Cat[0] - Center[0])
@@ -252,10 +302,8 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
         Lz_slab = (Lims[2][1] - Lims[2][0])
         Pos_An_live = Pos[(Types == anion_type) | (Types == 3)]
         Pos_An_check = np.vstack([Pos_An_live, Pos_An_live + [0, 0, Lz_slab],
-                                  Pos_An_live + [0, 0, -Lz_slab]])
+        Pos_An_live + [0, 0, -Lz_slab]])
         if len(Pos_An_live) > 0:
-            # Check that the candidate OH position does not collide with existing O/H
-            # atoms, including periodic copies in z.
             dist_cand = np.linalg.norm(Pos_An_check - Atom_O_candidate, axis=1)
             collision = float(np.min(dist_cand)) < collision_tol
         else:
@@ -276,8 +324,8 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
         Atom_O_candidate2 = Cat + place_dir*bond_length
         dist_cand2 = np.linalg.norm(Pos_An_check-Atom_O_candidate2, axis = 1)
 
-        if float(np.min(dist_cand2)) < collision_tol:
-            print("increase bond length or collision_tol")
+        # if float(np.min(dist_cand2)) < collision_tol:
+        #     print("increase bond length or collision_tol")
 
 
         Atom_O_add = Cat + place_dir * bond_length
@@ -308,6 +356,7 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
         Types[idx_cap] = 3
         Bonds_OH.append([idx_cap, num_at + 2])
         num_at += 3
+        partner_idx.append(idx_cap)
 
     if len(Atoms_add_pos) == 0:
         print("No under-coordinated cations found.")
@@ -323,6 +372,18 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
     (New_Pos[:, 2] >= (Lims[2, 1] + Lims[2, 0]))
     & (New_Pos[:, 2] < (Lims[2, 1]*2 + Lims[2, 0]))
     )
+
+    n_caps_total = len(Lack_Cat)
+    n_partner_unique = len(set(partner_idx))        # append idx_cap to partner_idx inside the loop
+    print("caps:", n_caps_total, "unique partner O:", n_partner_unique)
+
+    mid_types = New_Types
+    nTi = np.sum(mid_types == cation_type)
+    nO  = np.sum((mid_types == anion_type) | (mid_types == 3))
+    nH  = np.sum(mid_types == 4)
+    print("Ti:", nTi, "O(2+3):", nO, "H:", nH)
+    print("O excess vs 2*Ti:", nO - 2*nTi, " (should equal number of added OH, A)")
+
     New_Pos = New_Pos[Middle]
     New_Pos = New_Pos - np.array([0, 0, np.min(New_Pos[:, 2])])
     New_Types = New_Types[Middle]
@@ -357,13 +418,15 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
 
     return New_Pos, New_Types, Bonds_OH_corrected, Angles_OH
 
+
+
 # ---------------------------------------------------------------------------
 # Geometric Helical transformation
 # ---------------------------------------------------------------------------
 
-def transfo(Pos,Types,Lims,mass_map, metal = False, slide_z=0, mean = None,D=0,rota=0,enlarge=10,enlarge_z=0.700758, do_periodic=True,other_mapping=False,params_helix=[]):
+def transfo(Pos,Types,Lims,mass_map, mean = None,D=0,rota=0,enlarge=10, periodic=True,other_mapping=False,params_helix=[]):
     """
-    transfo(Pos,slide_z=0,D=0,rota=0,enlarge=10,enlarge_z=0.700758,do_periodic=True,circling=True,do_rota_transf=False)
+    transfo(Pos,D=0,rota=0,enlarge=10,periodic=True,circling=True,do_rota_transf=False)
 
     Do the coordinate transformations of the initial cuboid.
     The formula used for the circling is the elliptical grid mapping
@@ -373,18 +436,12 @@ def transfo(Pos,Types,Lims,mass_map, metal = False, slide_z=0, mean = None,D=0,r
     ----------
         Pos : List,
             The transformed position of the atoms
-        slide_z : float, optional
-            The amount of shifting in the z coordinate. If 0, will automatically put the lowest atom to 0
-            This is used to slide the transformed cast inside the helix
-            By default : 0
+
         rota : float, optional
             The amount of turn to do. By default 0
         enlarge : float, optional
             The space in Angstrom that is added in x and y. This is used to create empty space around the helix. By default 10
-        enlarge_z : float, optional
-            The space in A that is added in z. The value represent the distance between the highest atom and the border.
-            By default 0.700758
-        do_periodic : bool, optional
+        periodic : bool, optional
             do the creation of a periodic system after the transformation
         circling : bool, optional
             Circle the basis of the cuboid. This should be used to create helices as is gives much better curvatures. By default True
@@ -395,8 +452,8 @@ def transfo(Pos,Types,Lims,mass_map, metal = False, slide_z=0, mean = None,D=0,r
     -------
         Pos_transfo : The transformed positions
         Lims : the limits of the new system
-        slide_z : the amount of shift in the z coordinate the system has taken through the transformation
     """
+    enlarge_z = Lims[2] - np.max(Pos[:,2])
 
     mean = np.mean(Pos,axis=0)
     mean[2] = np.min(Pos[:,2])
@@ -436,7 +493,7 @@ def transfo(Pos,Types,Lims,mass_map, metal = False, slide_z=0, mean = None,D=0,r
 
     ### The helix transformation ###
 
-    # The equations were determined using a 2d roation matrix coupled with a rotation of the basis
+    # The equations were determined using a 2d rotation matrix coupled with a rotation of the basis
     # Another way to see the equations is to compute the tangent and two orthogonal normals to the direction of the 1d helix
     # And to transform the cuboid along these directions : one normal corresponds to y, the other to x and the tangent to x
 
@@ -453,13 +510,9 @@ def transfo(Pos,Types,Lims,mass_map, metal = False, slide_z=0, mean = None,D=0,r
     ## STEP 3: Transformation along x ##
     x_coord = R * np.sin(z*rota) - np.sin(z*rota) * y - Lz * np.cos(z*rota) / Norm * x
 
-    if slide_z == 0:
-        slide_z = np.min(z_coord)
-    else:
-         z_coord = z_coord - slide_z
 
     ## STEP 4: Add periodic conditions ##
-    if do_periodic:
+    if periodic:
         z_coord = (z_coord < 0) * (z_coord+Lz*2*np.pi) + (z_coord > Lz*2*np.pi) * (z_coord - Lz * 2 * np.pi) + (z_coord >= 0) * (z_coord <= Lz*2*np.pi) * z_coord
 
     # Slide to the initial mean
@@ -480,13 +533,12 @@ def transfo(Pos,Types,Lims,mass_map, metal = False, slide_z=0, mean = None,D=0,r
 # System generation
 # ---------------------------------------------------------------------------
 
-
-def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = False,
-                do_clean=True,do_periodic=True, file_duplicate="beta_quartz.data",file_output = "quartz_dupl.data",
-                file_output_cast = "quartz_int.data", mass_map = {1: 28.0855, 2: 15.9994, 3: 15.9994, 4: 1.0080}, metal = False):
+def create_helix(self,
+                file_duplicate="beta_quartz.data",file_output = "quartz_dupl.data",
+                file_output_cast = "quartz_int.data", mass_map = {1: 28.0855, 2: 15.9994, 3: 15.9994, 4: 1.0080},  cap_missing=2):
 
     """
-    create_syst(rota,D,pitch,width,thickness,int_thick,do_clean=True,do_periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False)
+    create_syst(rota,D,pitch,width,thickness,int_thick,clean_structure=True,periodic=True,circling=True,do_rota_transf=False,file_duplicate="beta_quartz.data",do_angles=False)
 
     This functions creates the whole system using the dimensions stated.
     It creates two files : by default quartz_dupl.data and quartz_int.data which contains the data of the surface and the data of the cast respectively.
@@ -495,7 +547,7 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
     ----------
         rota : float
             the amount of turns made by the helix
-        D_exp : float
+        diameter : float
             the diameter of the circle containing the helix.
         pitch : float
             the pitch, or the period of the helix
@@ -503,9 +555,9 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
             the width of the helix
         thickness : float
             the thickness of the helix
-        do_clean : bool, optional
+        clean_structure : bool, optional
             To clean or not the structure by adding H2O. By default True
-        do_periodic : bool, optional
+        periodic : bool, optional
             do the creation of a periodic system after the transformation
         circling : bool, optional
             Circle the basis of the cuboid. This should be used to create helices as is gives much better curvatures. By default True
@@ -518,23 +570,25 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
 
     Returns
     -------
-        Pos_transfo : list
-            The position of the atoms of the surface
-        Types : list
-            The type of the atoms of the surface
-        Lims : list
-            The limits of the surface
-        Angles_OH : list
-            The angles SiOH
-        Pos_transfo_cast : list
-            The position of the atoms of the interior
-        Types_cast : list
-            The type of the atoms of the interior
-        Lims_cast : list
-            The limits of the interior
+        Helix : helix
+            helix object that contains the information of the system
 
         Two files are also created : quartz_dupl.data and quartz_int.data by default
     """
+
+    #Get the values from the object
+    rota = self.turns
+    diameter = self.diameter
+    pitch = self.pitch
+    width = self.width
+    thickness = self.thickness
+    int_thick = self.int_thick
+    Twist = self.Twist
+    saturation = self.saturation
+    periodic = self.periodic
+
+    asym = 1
+
 
     use_cast = True
     Lims, Atom_types, Atom_pos, _ = read_data(file_duplicate,do_scale=False,atom_style="atom")
@@ -544,14 +598,15 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
     Lims_visu = [[np.max(Atom_pos[:,0]), np.min(Atom_pos[:,0])], [np.max(Atom_pos[:,1]), np.min(Atom_pos[:,1])], [np.max(Atom_pos[:,2]), np.min(Atom_pos[:,2])]]
     print("First RDF check on the FCC")
 
-    # Get the number of replication steps needed to fill the requested geometry.
-    # Nx and Ny set the slab width/thickness, Nz sets the pitch-length along z.
+    # visualize_cuboid(Atom_pos, Atom_types, Lims_visu)
+
+    # Get the number of duplication needed to get the proper dimensions
     lx = Lims[0][1] - Lims[0][0]
     ly = Lims[1][1] - Lims[1][0]
     lz = Lims[2][1] - Lims[2][0]
 
-    Nx = int(width // lx + 1)
-    Ny = int(thickness // ly + 1)
+    Nx = int(width // lx +1)
+    Ny = int(thickness // ly +1)
     Nz = int(pitch // lz + 1)
 
     Nx_int = int(int_thick // lx +1)
@@ -583,9 +638,9 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
 
     print(Nx_list,Ny_list,Nz)
 
-    if not metal:
-        Atom_pos[:,2] += lz/4
-        Atom_pos[:, 2] %= lz
+
+    Atom_pos[:,2] += lz/4
+    Atom_pos[:, 2] %= lz
 
     supercell_Lx = Nx*lx
     supercell_Ly = Ny*ly
@@ -632,34 +687,37 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
 
     if Twist:
         D_transfo = 0
+    print("Old D", D_transfo, D_exp)
 
-    ## Surface generation
-    if do_clean:
-        ## For oxides: clean the slab by adding OH passivation on undercoordinated cations.
-        # Build a temporary slab with an extra duplicate region so the surface cleaning
-        # can be applied while preserving only the interior after capping.
-        Pos, Types, Lims_tot, _a, _b = duplicate(Nx, Ny, 3, Lims, Atom_types, Atom_pos)
-        Pos, Types, Bonds_OH, _ = clean_structure(Pos, Types, Lims, N_list, periodic=True)
-        Angles_OH = []
-        Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1, 1, Nz, Lims, Types, Pos, Bonds_OH=Bonds_OH, Angles_OH=Angles_OH)
+    ##Surface
+    if saturation:
+        ## For oxydes --> need to "clean" the structure with OH bonds
+        # Create one slab that is corrected then duplicated Nz times
+        # The slab contains 3 duplicates as to only take the inside when doing the cleaning
+        Pos, Types, Lims_tot, _a, _b = duplicate(Nx,Ny,3,Lims,Atom_types,Atom_pos)
+        # visualize_cuboid(Pos, Types)
+        Pos, Types, Bonds_OH, _ = clean_structure(Pos, Types, Lims, N_list, periodic=True, cap_missing=cap_missing)
+        # visualize_cuboid(Pos, Types)
+        Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1,1,Nz,Lims,Types,Pos,Bonds_OH=Bonds_OH)
 
         # Adapt the pitch to the new z dimension to avoid problems with the periodicity of the system after the transformation
         pitch_actual = Nz*lz
         Pos[:,2] *=pitch/pitch_actual
         Lims_tot[2] *=pitch/pitch_actual
+        # visualize_cuboid(Pos, Types, Lims_visu)
+        # plot_rdf_type1type2(Pos, Types)
         write_data("cuboid.data", Pos, Types, Lims=Lims_tot, Bonds_OH=Bonds_OH, mass_map=mass_map)
 
     else:
         ## Create slab form which we remove the duplicate atoms ##
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx, Ny, Nz,Lims,Atom_types,Atom_pos)
 
-        if not metal:
-            print(Lims_tot)
+        pitch_actual = Nz*lz
+        Pos[:,2] *=pitch/pitch_actual
+        Lims_tot[2] *=pitch/pitch_actual
 
-            pitch_actual = Nz*lz
-            Pos[:,2] *=pitch/pitch_actual
-            Lims_tot[2] *=pitch/pitch_actual
 
+        # visualize_cuboid(Pos, Types, Lims_visu)
 
         Bonds_OH, Angles_OH = [], []
         Lims_visu = [[0,Nx*lx], [0, Ny*ly], [0, Nz*lz]]
@@ -670,7 +728,8 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
 
     ## Add cast to relax against during the dynamic
     if use_cast:
-        print("Separation between helix wall and cast")
+        Angles_OH = []
+        print("Separation between helix wall and cast is", int_thick, "Angstrom")
         # Mask to separate the surface and the cast later
         ## Need elliptical mapping for this ##
         mask_int_x = (((Pos[:,0] - Lims[0][0])//lx >= Nx_list[1]) & ((Pos[:,0] - Lims[0][0])//lx < Nx_list[2]))
@@ -680,21 +739,47 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
         mask_surf = ~mask_int
 
         # Transformation of the cuboid into the helice
-        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims, mass_map, metal = metal, D=D_transfo,rota=rota,do_periodic=do_periodic,params_helix=[pitch,width,thickness])
-        # import pyvista as pv
-        #pv.global_theme.jupyter_backend = "None"
-        visualize_structure(Pos_transfo, Types)
+        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims, mass_map, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness])
 
-        # Map original slab atoms to the transformed cast and surface partitions.
+        from scipy.spatial import cKDTree
+        # pairs = cKDTree(Pos).query_pairs(2.6, output_type='ndarray')
+        tree = cKDTree(Pos)
+        d_nn = np.median(tree.query(Pos, k=2)[0][:, 1])   # median 1st-neighbour distance
+        cutoff = 1.2 * d_nn                               # 2.6 for Cu-ish, ~3.46 for Au
+
+        pairs = tree.query_pairs(cutoff, output_type='ndarray')
+
+        if len(pairs) == 0:
+            print("No neighbour pairs found, skipping distortion check")
+        else:
+            i, j = pairs[:, 0], pairs[:, 1]
+            d0 = np.linalg.norm(Pos[i] - Pos[j], axis=1)
+            v = Pos_transfo[i] - Pos_transfo[j]
+            v[:, 2] -= pitch * np.round(v[:, 2] / pitch)       # periodic in z
+            d1 = np.linalg.norm(v, axis=1)
+            ratio = d1 / d0
+            print("ratio post/pre percentiles 1,5,50,95:", np.percentile(ratio, [1, 5, 50, 95]).round(3))
+            for k in np.argsort(ratio)[:10]:
+                print("types %d-%d  d0=%.3f  d1=%.3f  pre-pos %s" %
+                    (Types[i[k]], Types[j[k]], d0[k], d1[k], Pos[i[k]].round(2)))
+
+        print("Lims_tot", Lims_tot)
+        print("Lims_visu", Lims_visu)
+        # visualize_cuboid2(Pos_transfo, Types, cast_mask=mask_int)
+
+        # Mapping of the indices between cast and surface
         Pos_transfo_int = Pos_transfo[mask_int]
         Types_int = Types[mask_int]
         print("Cast after transformation")
-        visualize_structure_cast_surface_separation(Pos_transfo_int, Types_int, cast=True)
+        # visualize_cuboid(Pos_transfo_int, Types_int)
+        # visualize_cuboid2(Pos_transfo_int, Types_int, cast=True)
+
 
         Pos_transfo_surf = Pos_transfo[mask_surf]
         Types_surf = Types[mask_surf]
         print("Surface after transformation")
-        visualize_structure_cast_surface_separation(Pos_transfo_surf, Types_surf, cast=False)
+        # visualize_cuboid(Pos_transfo_surf, Types_surf)
+        # visualize_cuboid2(Pos_transfo_surf, Types_surf, cast=False)
 
         Ind_cut = mask_surf
         Ind_sum = np.cumsum(Ind_cut) - 1
@@ -734,19 +819,30 @@ def create_syst(rota,D_exp,pitch,width,thickness,int_thick, asym = 1, Twist = Fa
         else:
             print("Surface is empty")
 
+        nTi = np.sum(Types == 1)
+        nO  = np.sum((Types == 2) | (Types == 3))
+        nH  = np.sum(Types== 4)
+        print("Ti:", nTi, "O(2+3):", nO, "H:", nH)
+        print("O excess vs 2*Ti:", nO - 2*nTi, " (should equal number of added OH, A)")
+
         write_data(file_output_cast,Pos_transfo_int,Types_int,Lims_tot,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH, mass_map=mass_map)
 
     ## If we don't add a cast to relax against ##
     else:
+        Angles_OH = []
         print("No cast added, the helix is full")
         ## Transformation of the cuboid into the helice ##
-        Pos_transfo,Lims_tot = transfo(Pos,Types, Lims_tot, mass_map, metal = metal, D=D_transfo,rota=rota,do_periodic=do_periodic,params_helix=[pitch,width,thickness])
+        Pos_transfo,Lims_tot = transfo(Pos,Types, Lims_tot, mass_map, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness])
         Pos_transfo_int = []
         Types_int = []
         Pos_transfo_surf, Types_surf = Pos_transfo, Types
 
-        visualize_structure(Pos_transfo_surf, Types_surf)
+        # visualize_cuboid(Pos_transfo_surf, Types_surf)
         write_data(file_output, Pos_transfo_surf, Types_surf, Lims_tot,
                 Bonds_OH=Bonds_OH, Angles_OH=Angles_OH, mass_map=mass_map)
 
-    return Pos_transfo_surf, Types_surf, Lims_tot, Angles_OH, Pos_transfo_int, Types_int, Lims_tot
+    helix = shanc.helix(Pos_transfo_surf, Types_surf, Lims_tot, Bonds_OH, Angles_OH, Pos_transfo_int, Types_int, Lims_tot)
+    return helix
+
+
+helix.create_helix = create_helix
