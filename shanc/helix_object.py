@@ -94,7 +94,7 @@ class helix:
         self.periodic = True
 
         self.file_lattice = file_lattice
-        Atom_pos, Atom_types, Lims, mass_map, type_map = read_structure_from_file(file_lattice, do_scale=True, atom_style="atom")
+
         if file_lattice != "":
             try:
                 Atom_pos, Atom_types, Lims, mass_map, type_map = read_structure_from_file(file_lattice, do_scale=True, atom_style="atom")

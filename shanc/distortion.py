@@ -719,6 +719,19 @@ def create_helix(self,
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx,Ny,3,Lims_lattice,Types_lattice,Pos_lattice)
         # visualize_cuboid(Pos, Types)
         Pos, Types, Bonds_OH, _ = clean_structure(Pos, Types, Lims_lattice, N_list, periodic=True, cap_missing=cap_missing)
+
+        ##Add O and H to the mappings, SHOULD BE MORE GENERAL IN THE FUTURE
+        mass_map[3] = 15.9994
+        mass_map[4] = 1.0080
+        self.mass_map = mass_map
+
+        type_map = self.type_map
+        type_map[3] = "O"
+        type_map[4] = "H"
+        self.type_map = type_map
+
+
+
         # visualize_cuboid(Pos, Types)
         Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1,1,Nz,Lims_lattice,Types,Pos,Bonds_OH=Bonds_OH)
 

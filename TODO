@@ -1,0 +1,8 @@
+Add more except cases a bit everywhere
+Read_data for more atom style / more flexible
+Add radius / colors support for all functions
+Clean structure be more general, add more flexibility for the type, it should not be only 3 and 4
+Redo the analyze_mult function in the plotting
+Wiki
+add tests
+

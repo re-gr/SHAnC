@@ -23,7 +23,53 @@ import matplotlib.pyplot as plt
 import pyvista as pv
 from shanc.helix_object import *
 from scipy.spatial import KDTree
+import matplotlib.ticker as ticker
 
+
+ELEMENT_COLOURS = {
+    "H":	[255,255,255], "He":	[217,255,255], "Li":	[204,128,255], "Be":	[194,255,0],
+    "B":	[255,181,181],  "C":	[72,72,72],     "N":	[48,80,248]	,   "O":	[255,13,13]	,
+    "F":	[144,224,80],  "Ne":	[179,227,245], "Na":	[171,92,242],  "Mg":	[138,255,0]	,
+    "Al":	[191,166,166], "Si":	[240,200,160],  "P":	[255,128,0]	,   "S":	[255,255,48],
+    "Cl":	[31,240,31]	,  "Ar":	[128,209,227],  "K":	[143,64,212],  "Ca":	[61,255,0]	,
+    "Sc":	[230,230,230], "Ti":	[191,194,199],  "V":	[166,166,171], "Cr":	[138,153,199],
+    "Mn":	[156,122,199], "Fe":	[224,102,51],  "Co":	[240,144,160], "Ni":	[80,208,80]	,
+    "Cu":	[200,128,51],  "Zn":	[125,128,176], "Ga":	[194,143,143], "Ge":	[102,143,143],
+    "As":	[189,128,227], "Se":	[255,161,0]	,  "Br":	[166,41,41]	,  "Kr":	[92,184,209],
+    "Rb":	[112,46,176],  "Sr":	[0,255,0]	,   "Y":	[148,255,255], "Zr":	[148,224,224],
+    "Nb":	[115,194,201], "Mo":	[84,181,181],  "Tc":	[59,158,158],  "Ru":	[36,143,143],
+    "Rh":	[10,125,140],  "Pd":	[0,105,133]	,  "Ag":	[192,192,192], "Cd":	[255,217,143],
+    "In":	[166,117,115], "Sn":	[102,128,128], "Sb":	[158,99,181],  "Te":	[212,122,0]	,
+    "I":	[148,0,148]	,  "Xe":	[66,158,176],  "Cs":	[87,23,143],   "Ba":	[0,201,0],
+    "La":	[112,212,255], "Ce":	[255,255,199], "Pr":	[217,255,199], "Nd":	[199,255,199],
+    "Pm":	[163,255,199], "Sm":	[143,255,199], "Eu":	[97,255,199],  "Gd":	[69,255,199],
+    "Tb":	[48,255,199],  "Dy":	[31,255,199],  "Ho":	[0,255,156]	,  "Er":	[0,230,117]	,
+    "Tm":	[0,212,82]	,  "Yb":	[0,191,56]	,  "Lu":	[0,171,36]	,  "Hf":	[77,194,255],
+    "Ta":	[77,166,255],   "W":	[33,148,214],  "Re":	[38,125,171],  "Os":	[38,102,150],
+    "Ir":	[23,84,135]	,  "Pt":	[208,208,224], "Au":	[255,209,35],  "Hg":	[184,184,208],
+    "Tl":	[166,84,77]	,  "Pb":	[87,89,97]	,  "Bi":	[158,79,181],  "Po":	[171,92,0]	,
+    "At":	[117,79,69]	,  "Rn":	[66,130,150],  "Fr":	[66,0,102]	,  "Ra":	[0,125,0]	,
+    "Ac":	[112,171,250], "Th":	[0,186,255]	,  "Pa":	[0,161,255]	,   "U":	[0,143,255]	,
+    "Np":	[0,128,255]	,  "Pu":	[0,107,255]	,  "Am":	[84,92,242]	,  "Cm":	[120,92,227],
+    "Bk":	[138,79,227],  "Cf":	[161,54,212],  "Es":	[179,31,212],  "Fm":	[179,31,186],
+    "Md":	[179,13,166],  "No":	[189,13,135],  "Lr":	[199,0,102]	,  "Rf":	[204,0,89]	,
+    "Db":	[209,0,79]	,  "Sg":	[217,0,69]	,  "Bh":	[224,0,56]	,  "Hs":	[230,0,46]	,
+    "Mt":	[235,0,38]	,  "Ds":   [250,0,0],      "Rg":[250,0,0],         "Cn":[250,0,0],
+    "Nh":[250,0,0],        "Fl":[250,0,0],         "Mc":[250,0,0],         "Lv":[250,0,0],
+    "Ts":[250,0,0],        "Og":[250,0,0]
+}
+
+ELEMENT_RADIUS = dict_radii={
+    'H':0.83, 'He':0.87, 'Li':0.91, 'Be':0.94, 'B':0.97, 'C':0.99, 'N':1.01, 'O':1.04, 'F':1.06, 'Ne':1.07, 'Na':1.09, 'Mg':1.11, 'Al':1.12,
+    'Si':1.14, 'P':1.15, 'S':1.16, 'Cl':1.18, 'Ar':1.19, 'K':1.2, 'Ca':1.21, 'Sc':1.22, 'Ti':1.23, 'V':1.24, 'Cr':1.25, 'Mn':1.26, 'Fe':1.26,
+    'Co':1.27, 'Ni':1.28, 'Cu':1.41, 'Zn':1.41, 'Ga':1.3, 'Ge':1.31, 'As':1.31, 'Se':1.32, 'Br':1.33, 'Kr':1.33, 'Rb':1.34, 'Sr':1.34, 'Y':1.35,
+    'Zr':1.35, 'Nb':1.36, 'Mo':1.36, 'Tc':1.37, 'Ru':1.37, 'Rh':1.38, 'Pd':1.38, 'Ag':1.39, 'Cd':1.39, 'In':1.4, 'Sn':1.4, 'Sb':1.4, 'Te':1.41,
+    'I':1.41, 'Xe':1.42,'Cs':1.42, 'Ba':1.42, 'La':1.43, 'Ce':1.43, 'Pr':1.43, 'Nd':1.44, 'Pm':1.44, 'Sm':1.44, 'Eu':1.45, 'Gd':1.45, 'Tb':1.45,
+    'Dy':1.46, 'Ho':1.46, 'Er':1.46, 'Tm':1.47, 'Yb':1.47, 'Lu':1.47, 'Hf':1.48, 'Ta':1.48, 'W':1.48, 'Re':1.48, 'Os':1.49, 'Ir':1.49, 'Pt':1.49,
+    'Au':1.49, 'Hg':1.5, 'Tl':1.5, 'Pb':1.5, 'Bi':1.5, 'Po':1.51, 'At':1.51, 'Rn':1.51, 'Fr':1.51, 'Ra':1.52, 'Ac':1.52, 'Th':1.52, 'Pa':1.52,
+    'U':1.52, 'Np':1.53, 'Pu':1.53, 'Am':1.53, 'Cm':1.53, 'Bk':1.53, 'Cf':1.54, 'Es':1.54, 'Fm':1.54, 'Md':1.54, 'No':1.54, 'Lr':1.55, 'Rf':1.55,
+    'Db':1.55, 'Sg':1.55, 'Bh':1.55, 'Hs':1.56, 'Mt':1.56, 'Ds':1.6, 'Rg':1.6, 'Cn':1.6, 'Nh':1.6, 'Fl':1.6, 'Mc':1.6, 'Lv':1.6, 'Ts':1.6, 'Og':1.6
+}
 
 # ---------------------------------------------------------------------------
 # Bond computation
@@ -366,10 +412,8 @@ def compute_hist_neighbors(Pos, Types,
 # RDF plots
 # ---------------------------------------------------------------------------
 
-def plot_rdf_type1type2(Pos, Types,
-                        threshold_type1=2, threshold_type2=2,
+def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
                         rdf_max=3.2,
-                        periodic=False, Lims=[],
                         vline=1.95, density=True,
                         cation_type=1, anion_type=2,
                         title=None,
@@ -392,6 +436,14 @@ def plot_rdf_type1type2(Pos, Types,
     font_weight     : str    – tick/label font weight
     title_font_weight : str  – title font weight
     """
+
+    print("TO REview")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+    periodic = self.periodic
+
     Dist_list, _, _ = compute_hist_neighbors(
         Pos, Types,
         threshold_type1=threshold_type1, threshold_type2=threshold_type2,
@@ -443,9 +495,10 @@ def plot_rdf_type1type2(Pos, Types,
     plt.savefig("rdf_oxide.svg")
     plt.show()
 
+helix.plot_rdf_type1type2 = plot_rdf_type1type2
 
-def plot_rdf_metal(Pos, Types, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4.0,
-                   periodic=False, Lims=[], vline=2.95,
+def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4.0,
+                   vline=2.95,
                    font_weight='normal', title_font_weight='normal'):
     """
     Plot the metal–metal RDF.
@@ -462,6 +515,14 @@ def plot_rdf_metal(Pos, Types, type_id=1, cube=50, a_theory=4.078, bins=100, rdf
     vline         : float – reference bond distance marker (Å)
     font_weight, title_font_weight : str – matplotlib font weight strings
     """
+
+    print("TO REview")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+    periodic = self.periodic
+
     threshold  = rdf_max
     Pos_metal  = Pos
     N          = len(Pos_metal)
@@ -569,12 +630,13 @@ def plot_rdf_metal(Pos, Types, type_id=1, cube=50, a_theory=4.078, bins=100, rdf
     plt.savefig("rdf_metal.svg")
 
 
+helix.plot_rdf_metal = plot_rdf_metal
+
 # ---------------------------------------------------------------------------
 # Metal structure validation
 # ---------------------------------------------------------------------------
 
-def check_metal_structure(Pos, Types,
-                          type_id=1,
+def check_metal_structure(type_id=1,
                           a_theory=4.078,
                           threshold_nn=3.2,
                           cube=30,
@@ -602,6 +664,12 @@ def check_metal_structure(Pos, Types,
     report : dict – nn_dist_mean/std, cn_mean, cn_counts, n_too_close,
                     n_isolated, strain_mean/std
     """
+
+    print("TO REview")
+
+    Pos = self.Pos
+    Types = self.Types
+
     d_NN     = a_theory / np.sqrt(2)
     d_min_ok = 0.85 * d_NN
     pad      = threshold_nn + 0.2
@@ -717,9 +785,9 @@ def check_metal_structure(Pos, Types,
 # Oxide analysis helpers (compute + plot)
 # ---------------------------------------------------------------------------
 
-def compute_analysis(Pos, Types, hist_Dens, hist_Si, hist_O,
+def plot_compute_analysis(self, hist_Dens, hist_Si, hist_O,
                      threshold_type1=2, threshold_type2=2, threshold_H=1.3,
-                     periodic=False, Lims=[], rdf_max=5, density=True,
+                     rdf_max=5, density=True,
                      cation_type=1, anion_type=2):
     """
     Compute RDF histogram and bond-count histograms (used by analyze_mult).
@@ -728,6 +796,14 @@ def compute_analysis(Pos, Types, hist_Dens, hist_Si, hist_O,
     -------
     [hist_Dens, hist_Si, hist_O], Counts
     """
+
+    print("TO REview")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+    periodic = self.periodic
+
     Dist_list, Cat_count_An, An_count_Cat = compute_hist_neighbors(
         Pos, Types,
         threshold_type1=threshold_type1, threshold_type2=threshold_type2,
@@ -759,6 +835,7 @@ def compute_analysis(Pos, Types, hist_Dens, hist_Si, hist_O,
     print(Counts)
     return [hist_Dens, hist_Si, hist_O], Counts
 
+helix.plot_compute_analysis = plot_compute_analysis
 
 def plot_analysis(Counts_Hists, Counts, hist_Dens, hist_Si, hist_O):
     """Update histogram bar heights (used by analyze_mult)."""
@@ -774,6 +851,7 @@ def plot_analysis(Counts_Hists, Counts, hist_Dens, hist_Si, hist_O):
     hist_O[2].set_label(f"An–Cat Bonds {Counts[1]}")
 
 
+###########THIS FUNCTIONS HAS TO BE REDONE
 def analyze_mult(list_Tstep, list_Pos, list_Types,
                  threshold_type1=2, threshold_type2=2, threshold_H=1.3,
                  rdf_max=5, periodic=False, Lims=[],
@@ -798,6 +876,7 @@ def analyze_mult(list_Tstep, list_Pos, list_Types,
     cation_type   : int   – type id of the cation, default 1
     anion_type    : int   – type id of the anion,  default 2
     """
+
     purple      = np.array([ 96,  25, 255]) / 255
     dark_purple = np.array([ 56,  20, 180]) / 255
 
@@ -891,7 +970,7 @@ def analyze_mult(list_Tstep, list_Pos, list_Types,
 # Defect analysis / saving
 # ---------------------------------------------------------------------------
 
-def save_defects(file_name, Pos, Types, periodic=False, Lims=[],
+def save_defects(self, file_name="defects.txt",
                  cation_type=1, anion_type=2):
     """
     Re-map atom types to encode coordination defects and write an XYZ file.
@@ -899,6 +978,14 @@ def save_defects(file_name, Pos, Types, periodic=False, Lims=[],
     Normal coordination (type 1 → 1, type 2 → 2) is preserved; under- and
     over-coordinated atoms receive higher type ids for easy visualisation.
     """
+
+    print("TO REview")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+    periodic = self.periodic
+
     _, Cat_count_An, An_count_Cat = compute_hist_neighbors(
         Pos, Types, cube=30, periodic=periodic, Lims=Lims, rdf_max=5,
         cation_type=cation_type, anion_type=anion_type,
@@ -920,7 +1007,7 @@ def save_defects(file_name, Pos, Types, periodic=False, Lims=[],
 
     write_xyz(file_name, Pos, Types)
 
-
+helix.save_defects = save_defects
 # ---------------------------------------------------------------------------
 # Surface (QuickSurf) and curvature analysis
 # ---------------------------------------------------------------------------
@@ -933,7 +1020,7 @@ def compute_quick_surface(Pos, grid, Lims, alpha=2, prec=20, d=10,
     This function evaluates a Gaussian density field on a 3D grid by dividing
     the space into smaller boxes and summing contributions from nearby atoms.
 
-    ρ(r) = Σ exp(−|r − rᵢ|² / 2α²)
+    ρ(r) = \\sum exp(−|r − r_i|^2 / 2\\alpha^2)
 
     The system is divided into boxes to avoid building the full distance
     matrix; multithreading is supported.
@@ -1012,8 +1099,7 @@ def compute_quick_surface(Pos, grid, Lims, alpha=2, prec=20, d=10,
     return cube
 
 
-def plot_analyze_defects(Pos, Types, periodic=False, Lims=[],
-                    Cycles=None, L_cycles=None,
+def plot_analyze_defects(self, Cycles=None, L_cycles=None,
                     d_spacing=5, isovalue=1., alpha=2., prec=20,
                     d=10, length_box=20, smoothing=1000, N_th=8,
                     cation_type=1, anion_type=2, metal = False):
@@ -1026,6 +1112,14 @@ def plot_analyze_defects(Pos, Types, periodic=False, Lims=[],
                     d=10, length_box=20, smoothing=1000, N_th=8,
                     cation_type=1, anion_type=2):
     """
+    print("TO REview")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+    periodic = self.periodic
+
+
     _, Cat_count_An, An_count_Cat = compute_hist_neighbors(
         Pos, Types, cube=30, periodic=periodic, Lims=Lims, rdf_max=5,
         cation_type=cation_type, anion_type=anion_type, metal = metal
@@ -1078,14 +1172,20 @@ def plot_analyze_defects(Pos, Types, periodic=False, Lims=[],
         plotter.add_mesh(smooth, opacity=0.1, color="red", name="contour")
         plotter.show()
 
+helix.plot_analyze_defects = plot_analyze_defects
 
-
-def analyze_density(Pos, periodic=False, Lims=[],
-                    d_spacing=5, isovalue=5., alpha=2., prec=20,
+def plot_analyze_density(self, d_spacing=5, isovalue=2., alpha=2., prec=20,
                     d=10, length_box=20, smoothing=1000, N_th=8):
     """
     Render an isosurface coloured by local atom density.
     """
+    print("TO REview")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+    periodic = self.periodic
+
     rdf_max = 20
     Lx, Ly, Lz = np.max(Pos, axis=0) + d
     lx, ly, lz = np.min(Pos, axis=0) - d
@@ -1122,6 +1222,8 @@ def analyze_density(Pos, periodic=False, Lims=[],
                                       "title_font_size": 40,
                                       "label_font_size": 40})
     plotter.show()
+
+helix.plot_analyze_density = plot_analyze_density
 
 
 # ---------------------------------------------------------------------------
@@ -1265,7 +1367,7 @@ def validate_unit_cell(Atom_pos, Atom_types, Lims,
     return all_ok
 
 
-def plot_structure_quick(self, point_size=12, type_colors=None,
+def plot_structure(self, point_size=12, type_colors=None,
                         sphere=True, parallel_proj=True,
                         draw_bonds=True, max_bond_dist=2.0):
     """Render the atomic structure in 3D using PyVista.
@@ -1295,18 +1397,34 @@ def plot_structure_quick(self, point_size=12, type_colors=None,
     Types = self.Types
     Lims = self.Lims
 
-    if type_colors is None:
-        type_colors = {1: 'gold', 2: 'red', 3: 'blue', 4: [255, 255, 0]}
+    type_colors = {}
+    type_radius = {}
 
-    radii = {1: 0.5, 2: 0.4, 3: 0.8, 4: 0.8}
+
+    type_map = self.type_map
+    if type_map != {}:
+        for type in type_map:
+            symbol = type_map[type]
+            colour = ELEMENT_COLOURS[symbol]
+            type_colors[type] = colour
+            radius = ELEMENT_RADIUS[symbol]
+            type_radius[type] = radius/2
+
+    else:
+        #Hopefully there are no more than 4 types of atom........
+        type_colors = {1: 'gold', 2: 'red', 3: 'blue', 4: [255, 255, 0]}
+        type_radius = {1: 0.5, 2: 0.4, 3: 0.8, 4: 0.8}
+
     plotter = pv.Plotter()
 
-    for t, color in type_colors.items():
-        mask = Types == t
+    for type in type_colors:
+        radius = type_radius[type]
+        color = type_colors[type]
+        mask = (Types == type)
         if not np.any(mask):
             continue
         if sphere:
-            geom = pv.Sphere(radius=radii.get(t, 0.5))
+            geom = pv.Sphere(radius=radius)
             mesh = pv.PolyData(Pos[mask].astype(float)).glyph(scale=False, geom=geom, orient=False)
         else:
             mesh = pv.PolyData(Pos[mask].astype(float))
@@ -1315,6 +1433,7 @@ def plot_structure_quick(self, point_size=12, type_colors=None,
     if draw_bonds:
         tree = KDTree(Pos)
         for i, j in tree.query_pairs(r=max_bond_dist):
+            ###THIS WILL NOT WORK FOR METALS....
             if Types[i] != Types[j]:
                 plotter.add_mesh(pv.Line(Pos[i], Pos[j]),
                                  color="gray", line_width=10, lighting=False)
@@ -1331,9 +1450,9 @@ def plot_structure_quick(self, point_size=12, type_colors=None,
         plotter.enable_parallel_projection()
     plotter.show()
 
-helix.plot_structure_quick = plot_structure_quick
+helix.plot_structure = plot_structure
 
-def visualize_structure_cast_surface_separation(Pos, Types, Lims=None, point_size=12,
+def visualize_structure_cast_surface_separation(self, point_size=12,
                                                 type_colors=None, sphere=True,
                                                 parallel_proj=True,
                                                 cast_mask=None, cast=False):
@@ -1364,6 +1483,14 @@ def visualize_structure_cast_surface_separation(Pos, Types, Lims=None, point_siz
     -------
     None
     """
+
+    print("TO FINISH with the radius and colors")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+
+
     radii = {1: 0.5, 2: 0.4, 3: 0.8, 4: 0.8}
     plotter = pv.Plotter()
 
@@ -1403,11 +1530,23 @@ def visualize_structure_cast_surface_separation(Pos, Types, Lims=None, point_siz
         plotter.enable_parallel_projection()
     plotter.show()
 
-def visualize_close_contacts(Pos, Types, Lims=None, threshold=1.0,
+
+helix.visualize_structure_cast_surface_separation = visualize_structure_cast_surface_separation
+
+
+def visualize_close_contacts(self, threshold=1.0,
                               point_size=8, type_colors=None, type=1):
     """
     Highlight same-type atom pairs closer than *threshold* Å.
     """
+
+    print("TO FINISH with colors and radius etc...")
+
+    Pos = self.Pos
+    Types = self.Types
+    Lims = self.Lims
+
+
     if type_colors is None:
         type_colors = {1: "gold", 2: "red", 3: "blue"}
 
@@ -1451,3 +1590,5 @@ def visualize_close_contacts(Pos, Types, Lims=None, threshold=1.0,
             style="wireframe",
         )
     plotter.show()
+
+helix.visualize_close_contacts = visualize_close_contacts

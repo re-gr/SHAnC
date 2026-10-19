@@ -973,7 +973,7 @@ def read_structure_from_file(file, do_scale=True, atom_style="full"):
         mass_map = _symbol_to_mass_map(type_map)
 
     else:
-        list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(dump_file, unscale=False)
+        list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file, unscale=False)
         Lims = list_BOX[-1]
         Atoms_last_step = list_ATOMS[-1]
         Atom_types = Atoms_last_step[:,1]
