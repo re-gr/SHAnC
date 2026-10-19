@@ -1,0 +1,28 @@
+[project]
+name = "SHAnC"
+version = "0.0.1"
+authors = [
+	{name = "Rémi Grincourt", email = "remi.grincourt@ens-lyon.fr"},
+	{name = "Maewenn Temey", email = "maewenn.temey@ens-lyon.fr"},
+]
+description = "SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used to Construct and Analyze Silica Helices."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+keywords = ["nanohelices","chemistry","materials","helices","construction"]
+classifiers = [
+	"Development Status :: 4 - Beta",
+	"Programming Language :: Python :: 3.12",
+]
+dependencies = [
+	"numpy",
+	"scipy",
+	"pyvista",
+	"matplotlib"
+]
+[project.urls]
+Repository = "https://github.com/re-gr/shanc"
+
+[build-system]
+requires = ["setuptools","setuptools-scm"]
+build-backend = "setuptools.build_meta"
