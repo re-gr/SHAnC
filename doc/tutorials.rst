@@ -23,19 +23,14 @@ Getting Started
 .. pyvista-plot::
 
   import shanc
-  import numpy as np
+  import shanc.examples
 
+  pitch = 100.
+  width = 30.
+  thickness = 20.
+  diameter = 60.
+  turns = 1
 
-  target_folder = '/home/rg/SHAnC_2/SHAnC/demo_system/Analysis_example/sio2_pitch_200'
-
-  file = target_folder + "/last_timestep.lammpstrj"
-  list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = c.read_write.read_dump(file,unscale=True)
-
-  # Analyze data file
-  Pos = list_ATOMS[-1][:,2:]
-  Types = list_ATOMS[-1][:,1]
-  Lims = list_BOX[-1]
-
-  # Plots and visualisation of the structure
-  shanc.analysis.plot_analyze_defects(Pos,Types,periodic=True,Lims=Lims)
-
+  helix = shanc.helix(pitch=pitch,width=width,thickness=thickness,diameter=diameter,turns=turns,file_lattice=shanc.examples.SiO2)
+  helix.create_helix()
+  helix.plot_structure()

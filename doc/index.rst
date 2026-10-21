@@ -6,16 +6,14 @@
 Welcome to SHAnC documentation
 ===============================
 
-SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used to Construct and Analyze Silica Helices.
+SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used to construct and analyse various type of helices and twisted ribbons.
 
+Tutorials
+---------
 
+A detailed tutorial on how to build and analyse the helices can be found here.
 
 .. toctree::
    :maxdepth: 4
-   :caption: Tutorials:
 
    tutorials
-
-
-
-
