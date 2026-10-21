@@ -4,6 +4,7 @@ permissions:
   contents: write
 jobs:
   docs:
+    if: startsWith(github.event.ref, 'refs/tags/wiki')  # only redo the wiki when asked
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
