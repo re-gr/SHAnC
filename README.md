@@ -5,19 +5,13 @@ SHAnC
 SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used to Construct and Analyze Silica Helices.
 
 - **Github :** https://github.com/re-gr/SHAnC
+- **wiki :** https://re-gr.github.io/SHAnC/
 
 ## Getting Started
 
-- Construction : the scripts that are used to create an helix or a twisted ribbon
-    - distorsion.py : create helices and ribbons
-    - read\_write.py : read and write files
-    - script\_analysis.py : analysis (rdf, saturation ...) of structures
-    - script\_cycles.py : cycle analysis of structures (WIP)
+- in construction...
 
-- Torsion : the scripts are used to twist the cuboids to the proper shape. This method should not be used, but is kept here just in case.
-    - distorsion.py : old version of the script in construction that should be compatible with the other script
-    - script\_launch.py : script to create the systems and input file for the simulations
-
+- the wiki can be found [here](https://re-gr.github.io/SHAnC/)
 
 ## Depedencies
 
@@ -25,7 +19,11 @@ SHAnC (Silica Helices Analysis & Construction) is a collection of scripts used t
 	scipy
    	matplotlib
 	pyvista
-	lammps (optional, for torsion only)
+	
+
+## MD software support
+    [lammps](https://www.lammps.org/)
+
 
 ## Contact
 
