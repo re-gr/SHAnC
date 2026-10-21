@@ -1,0 +1,9 @@
+html {
+  --pst-header-height: 3rem;
+   --pst-font-size-h1: 2.125rem;
+   --pst-font-size-h2: 1.75rem;
+  --pst-font-size-h3: 1.5rem;
+  --pst-font-size-h4: 1.25rem;
+  --pst-font-size-h5: 1rem;
+  --pst-font-size-h6: 0.8rem;
+}
