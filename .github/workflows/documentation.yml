@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-python@v5
       - name: Install dependencies
         run: |
-          pip install sphinx sphinx_rtd_theme myst_parser pyvista numpy scipy sphinx_design sphinx-copybutton trame-vtk 'pyvista[jupyter]' sphinxcontrib.asciinema
+          pip install sphinx sphinx_rtd_theme myst_parser pyvista numpy scipy sphinx_design sphinx-copybutton trame-vtk 'pyvista[jupyter]' sphinxcontrib.asciinema pydata-sphinx-theme
       - name: Sphinx build
         run: |
           sphinx-build doc _build
