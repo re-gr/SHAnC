@@ -11,7 +11,7 @@ jobs:
       - uses: pyvista/setup-headless-display-action@v3
       - name: Install dependencies
         run: |
-          pip install sphinx sphinx_rtd_theme myst_parser pyvista numpy scipy sphinx_design sphinx-copybutton trame-vtk 'pyvista[jupyter]' sphinxcontrib.asciinema pydata-sphinx-theme
+          pip install sphinx sphinx_rtd_theme myst_parser pyvista numpy scipy sphinx_design sphinx-copybutton trame-vtk 'pyvista[jupyter]' sphinxcontrib.asciinema pydata-sphinx-theme shanc
       - name: Sphinx build
         run: |
           sphinx-build doc _build
