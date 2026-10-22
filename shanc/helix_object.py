@@ -13,10 +13,11 @@ class helix:
 
     def __init__(self, pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = ""):
         """
-        helix(pitch, width, thickness, diameter, turns)
+        helix(pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = "")
 
         Constructs the helix object containing the atoms and the casts.
-        This is just the initialisation, please use helix.set_parameters ...
+        If one provides the "file_lattice", the lattice will be directly loaded.
+
 
         Attributes
         ----------
@@ -35,17 +36,37 @@ class helix:
             Types : list
                 The types of the atoms
             Lims : list
-                The coordinate limits of the system
-            Bonds : list, optional
+                The limit coordinates of the system
+            Bonds : list
                 The list of the bonds typically used for analysis
             Angles : list
                 The angles of the OH bonds used to complete the system
-            Pos_cast : list, optional
+            type_map : dict
+                the mapping of the type of atom used by LAMMPS and the atomic name
+            mass_map : dict
+                the mapping of the type of atom used by LAMMPS and the atomic mass
+            cast : bool
+                If a cast is present or not.
+            Pos_cast : list
                 The position of the atoms of the cast
-            Types_cast : list, optional
+            Types_cast : list
                 The type of the atoms of the cast
-            Lims_cast : list, optional
-                The coordinate limits of the cast
+            Lims_cast : list
+                The limit coordinates of the cast
+            Pos_lattice : list
+                The position of the atoms for the lattice
+            Types_lattice : list
+                The types of the atoms for the lattice
+            Lims_lattice : list
+                The limit coordinates for the lattice
+            twist : bool
+                If the helix is a twisted ribbon or not
+            saturation : bool
+                If the helix has to be saturated or not
+            periodic : bool
+                If the system should be treated as periodic or not
+            file_lattice : str
+                The name of the file containing the lattice.
 
         Parameters
         ----------
@@ -178,19 +199,41 @@ class helix:
 
         self.twist = twist
 
-    def set_atoms(self,Pos,Types,Lims,Bonds,Angles,type_atom_map):
+    def set_atoms(self,Pos,Types,Lims,Bonds,Angles,type_map,mass_map):
         """
         set_atoms(Pos,Types,Lims,Bonds,Angles)
 
         Set the atoms of the helix
 
+        Parameters
+        ----------
+            Pos : list
+                The position of the atoms
+            Types : list
+                The types of the atoms
+            Lims : list
+                The limit coordinates of the system
+            Bonds : list
+                The list of the bonds typically used for analysis
+            Angles : list
+                The angles of the OH bonds used to complete the system
+            type_map : dict
+                the mapping of the type of atom used by LAMMPS and the atomic name
+            mass_map : dict
+                the mapping of the type of atom used by LAMMPS and the atomic mass
+
+        Returns
+        -------
+            None
+                The attributes are set
         """
         self.Pos = Pos
         self.Types = Types
         self.Lims = Lims
         self.Bonds = Bonds
         self.Angles = Angles
-        self.type_atom_map = type_atom_map
+        self.type_map = type_map
+        self.mass_map = mass_map
 
 
     def set_saturation(self,saturation):
@@ -198,6 +241,15 @@ class helix:
         set_saturation(saturation)
 
         Set if the algorithm to saturate the system with H2O is done or not
+
+        Parameters
+        ----------
+            saturation : bool
+
+        Returns
+        -------
+            None
+                The attribute is set
         """
 
         self.saturation = saturation
@@ -207,6 +259,15 @@ class helix:
         set_periodic(periodic)
 
         Set if the system is periodic or not
+
+        Parameters
+        ----------
+            periodic : bool
+
+        Returns
+        -------
+            None
+                The attribute is set
         """
 
         self.periodic = periodic
@@ -216,6 +277,20 @@ class helix:
         set_lattice(Pos_lattice,Types_lattice,Lims_lattice)
 
         Sets the parameters for the lattice
+
+        Parameters
+        ----------
+            Pos_lattice : list
+                The position of the atoms for the lattice
+            Types_lattice : list
+                The types of the atoms for the lattice
+            Lims_lattice : list
+                The limit coordinates for the lattice
+
+        Returns
+        -------
+            None
+                The attributes are set
         """
         self.Pos_lattice = Pos_lattice
         self.Types_lattice = Types_lattice
@@ -226,7 +301,17 @@ class helix:
         """
         read_lattice(file_lattice)
 
-        reads a lattice file
+        Reads a lattice file
+
+        Parameters
+        ----------
+            file_lattice : str
+                The name of the file containing the lattice
+
+        Returns
+        -------
+            None
+                The file is read and the attributes are set
         """
         self.file_lattice = file_lattice
         Atom_pos, Atom_types, Lims, mass_map, type_map = read_structure_from_file(file_lattice, do_scale=True, atom_style="atom")

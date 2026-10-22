@@ -748,7 +748,9 @@ def create_helix(self,
 
         # visualize_cuboid(Pos, Types, Lims_visu)
         # plot_rdf_type1type2(Pos, Types)
-        write_data("cuboid.data", Pos, Types, Lims=Lims_tot, Bonds_OH=Bonds_OH, mass_map=mass_map)
+
+        #Should not be saved by default, maybe add keyword or something
+        # write_data("cuboid.data", Pos, Types, Lims=Lims_tot, Bonds_OH=Bonds_OH, mass_map=mass_map)
 
     else:
         ## Create slab form which we remove the duplicate atoms ##
