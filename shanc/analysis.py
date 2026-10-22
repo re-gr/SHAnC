@@ -263,7 +263,7 @@ def compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold
 
 
 def compute_bonds_system(Pos, Types,
-                           cube=50,
+                           cube=30,
                            threshold_type1=2, threshold_type2=2, threshold_H=1.3,
                            periodic=True, Lims=[], rdf_max=5,
                            cation_type=1, anion_type=2, metal = False):
@@ -307,7 +307,6 @@ def compute_bonds_system(Pos, Types,
     Pos_added   = np.copy(Pos)
     Types_added = np.copy(Types)
 
-    Num_Cat_or = np.sum(Types == cation_type)
 
     mask_Cat = (Types == cation_type)
     mask_An = (Types == anion_type) | (Types==3) #NEED TO CHANGE HARDCODED
@@ -327,6 +326,7 @@ def compute_bonds_system(Pos, Types,
             Types[Pos_remove_z],
         ])
 
+
     Num_at  = len(Types)
     Num_Cat = np.sum(Types == cation_type)
     Num_An  = 0 if metal else np.sum((Types == anion_type) | (Types == 3))
@@ -334,15 +334,12 @@ def compute_bonds_system(Pos, Types,
         [True] * Num_at + [False] * (len(Pos_added) - Num_at), dtype=bool
     )
 
-    Cat_count_An_tot = np.zeros(Num_Cat)
-    An_count_Cat_tot = np.zeros(Num_An)
+
     Bonds = np.zeros((Num_Cat,Num_An))
 
     for x in range(Nx):
         for y in range(Ny):
             for z in range(Nz):
-
-
 
                 # Padded cube – for bond counting / RDF neighbours
                 mask_p = (
@@ -368,11 +365,18 @@ def compute_bonds_system(Pos, Types,
                     anion_type=anion_type,
                     metal = metal
                 )
-                print(np.shape(In_trunc),np.shape(mask_Cat),np.shape(mask_p),np.shape(Bonds),np.shape(mask_p[mask_Cat*In_trunc]),np.shape(mask_p[mask_An*In_trunc]),Num_An)
-                print(np.shape(bonds))
-                Bonds_Cat = Bonds[mask_p[mask_Cat*In_trunc]]
-                Bonds_Cat[:,mask_p[mask_An*In_trunc]] += bonds
-                Bonds[mask_p[mask_Cat*In_trunc]] = Bonds_Cat
+
+
+                mask_Cat_p = Types_trunc == cation_type
+                mask_An_p = (Types_trunc == anion_type) | (Types_trunc == 3) #TO CHANGE TOO SPECIFIC
+
+                # print(np.shape(In_trunc[mask_p]),np.shape(In_trunc[mask_p][mask_Cat_p]),np.shape())
+                bonds_in = bonds[In_trunc[mask_p][mask_Cat_p]][:,In_trunc[mask_p][mask_An_p]]
+
+                Bonds_Cat = Bonds[mask_p[In_trunc][mask_Cat]]
+                Bonds_Cat[:,mask_p[In_trunc][mask_An]] += bonds_in
+                Bonds[mask_p[In_trunc][mask_Cat]] = Bonds_Cat
+
     return Bonds
 
 
@@ -1484,7 +1488,7 @@ def validate_unit_cell(Atom_pos, Atom_types, Lims,
 
 def plot_structure(self, point_size=12, type_colors=None,
                         sphere=True, parallel_proj=True,
-                        draw_bonds=True, max_bond_dist=2.0):
+                        draw_bonds=False, max_bond_dist=2.0):
     """Render the atomic structure in 3D using PyVista.
 
     Parameters
@@ -1546,19 +1550,32 @@ def plot_structure(self, point_size=12, type_colors=None,
         plotter.add_mesh(mesh, color=color, lighting=False)
 
     if draw_bonds:
+
+        mesh = pv.PolyData(Pos.astype(float))
+
         Bonds = compute_bonds_system(Pos,Types,Lims=Lims)
 
-        N_Si,N_O = np.shape(Bonds)
-        Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
+        N_at = np.shape(Pos)[0]
+        Bonds_all = np.zeros((N_at,N_at))
+        N_Cat = np.sum(Types==1)
+        Bonds_inter = np.zeros((N_Cat,N_at))
+        mask_Cat = (Types==1)
+        mask_An = (Types==2) | (Types==3)
 
-        Pos_Si = Pos[Types==1]
-        Pos_O = Pos[(Types==2) | (Types==3)]
+        Bonds_inter[:,mask_An] = Bonds
+        Bonds_all[mask_Cat] = Bonds_inter
 
-        Indices = Indices[Bonds.ravel()!=0]
 
-        tubes = [pv.Line(Pos_Si[i_si],Pos_O[i_o]) for i_si,i_o in Indices]
-        mesh = tubes[0].merge(tubes[1:])
+        Indices = (np.arange(0,N_at).reshape(N_at,1,1)*np.array([1,0]) + np.arange(0,N_at).reshape((1,N_at,1))*np.array([0,1])).reshape((N_at*N_at,2))
+
+
+        Indices = Indices[Bonds_all.ravel()!=0]
+
+        lines = np.hstack([[2, i_si, i_o] for i_si, i_o in Indices])
+        mesh.lines = lines
+
         plotter.add_mesh(mesh,line_width=10,color="gray")
+
 
     if Lims is not None:
         plotter.add_mesh(
