@@ -261,6 +261,121 @@ def compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold
 # Neighbour histogram (scalable, periodic-aware)
 # ---------------------------------------------------------------------------
 
+
+def compute_bonds_system(Pos, Types,
+                           cube=50,
+                           threshold_type1=2, threshold_type2=2, threshold_H=1.3,
+                           periodic=True, Lims=[], rdf_max=5,
+                           cation_type=1, anion_type=2, metal = False):
+    """
+    Compute bond counts and RDF distances by slicing the system into sub-cubes.
+
+    Parameters
+    ----------
+    Pos             : (N, 3) array
+    Types           : (N,)   array
+    cube            : float  – sub-cube edge length (Å), default 100
+    threshold_type1 : float  – cation–anion cutoff (Å), default 2
+    threshold_type2 : float  – anion–cation cutoff (Å), default 2
+    threshold_H     : float  – O–H cutoff (Å), default 1.3
+    periodic        : bool   – apply z-periodic boundary, default True
+    Lims            : list   – [[lx,Lx],[ly,Ly],[lz,Lz]], required for PBC
+    rdf_max         : float  – RDF cutoff radius (Å), default 5
+    cation_type     : int    – type id of the cation, default 1
+    anion_type      : int    – type id of the anion,  default 2
+
+    Returns
+    -------
+    Dist_list, Cat_count_An_tot, An_count_Cat_tot
+    """
+    Lx, Ly, Lz = np.max(Pos, axis=0)
+    lx, ly, lz = np.min(Pos, axis=0)
+
+    # Use the system bounds from Pos unless periodic limits are explicitly provided.
+    if periodic:
+        if len(Lims) == 0:
+            print("No limits provided – running as non-periodic.")
+            periodic = False
+        else:
+            lz, Lz = Lims[2]
+
+    # Divide the cell into cubic subregions for scalable neighbor counting.
+    Nx = int((Lx - lx) // cube + 1)
+    Ny = int((Ly - ly) // cube + 1)
+    Nz = int((Lz - lz) // cube + 1)
+
+    Pos_added   = np.copy(Pos)
+    Types_added = np.copy(Types)
+
+    Num_Cat_or = np.sum(Types == cation_type)
+
+    mask_Cat = (Types == cation_type)
+    mask_An = (Types == anion_type) | (Types==3) #NEED TO CHANGE HARDCODED
+
+    if periodic:
+        Pos_add_z    = Pos[:, 2] > (Lz - rdf_max)
+        Pos_remove_z = Pos[:, 2] < (lz + rdf_max)
+
+        Pos_added = np.vstack([
+            Pos_added,
+            Pos[Pos_add_z]    - [0, 0, Lz - lz],
+            Pos[Pos_remove_z] + [0, 0, Lz - lz],
+        ])
+        Types_added = np.concatenate([
+            Types_added,
+            Types[Pos_add_z],
+            Types[Pos_remove_z],
+        ])
+
+    Num_at  = len(Types)
+    Num_Cat = np.sum(Types == cation_type)
+    Num_An  = 0 if metal else np.sum((Types == anion_type) | (Types == 3))
+    In_trunc = np.array(
+        [True] * Num_at + [False] * (len(Pos_added) - Num_at), dtype=bool
+    )
+
+    Cat_count_An_tot = np.zeros(Num_Cat)
+    An_count_Cat_tot = np.zeros(Num_An)
+    Bonds = np.zeros((Num_Cat,Num_An))
+
+    for x in range(Nx):
+        for y in range(Ny):
+            for z in range(Nz):
+
+
+
+                # Padded cube – for bond counting / RDF neighbours
+                mask_p = (
+                    (Pos_added[:, 0] >= x*cube + lx - rdf_max) & (Pos_added[:, 0] < (x+1)*cube + lx + rdf_max) &
+                    (Pos_added[:, 1] >= y*cube + ly - rdf_max) & (Pos_added[:, 1] < (y+1)*cube + ly + rdf_max) &
+                    (Pos_added[:, 2] >= z*cube + lz - rdf_max) & (Pos_added[:, 2] < (z+1)*cube + lz + rdf_max)
+                )
+                Pos_trunc   = Pos_added[mask_p]
+                Types_trunc = Types_added[mask_p]
+
+                if not (np.any(Types_trunc == cation_type) and np.any(Types_trunc == anion_type)):
+                    continue
+                if not metal and not np.any(Types_trunc == cation_type):
+                    continue
+
+                bonds, _, _, _, _ = _compute_bonds(
+                    Pos_trunc, Types_trunc,
+                    threshold_type1=threshold_type1,
+                    threshold_type2=threshold_type2,
+                    threshold_H=threshold_H,
+                    do_count_type_3=True,
+                    cation_type=cation_type,
+                    anion_type=anion_type,
+                    metal = metal
+                )
+                print(np.shape(In_trunc),np.shape(mask_Cat),np.shape(mask_p),np.shape(Bonds),np.shape(mask_p[mask_Cat*In_trunc]),np.shape(mask_p[mask_An*In_trunc]),Num_An)
+                print(np.shape(bonds))
+                Bonds_Cat = Bonds[mask_p[mask_Cat*In_trunc]]
+                Bonds_Cat[:,mask_p[mask_An*In_trunc]] += bonds
+                Bonds[mask_p[mask_Cat*In_trunc]] = Bonds_Cat
+    return Bonds
+
+
 def compute_hist_neighbors(Pos, Types,
                            cube=100,
                            threshold_type1=2, threshold_type2=2, threshold_H=1.3,
@@ -1431,12 +1546,19 @@ def plot_structure(self, point_size=12, type_colors=None,
         plotter.add_mesh(mesh, color=color, lighting=False)
 
     if draw_bonds:
-        tree = KDTree(Pos)
-        for i, j in tree.query_pairs(r=max_bond_dist):
-            ###THIS WILL NOT WORK FOR METALS....
-            if Types[i] != Types[j]:
-                plotter.add_mesh(pv.Line(Pos[i], Pos[j]),
-                                 color="gray", line_width=10, lighting=False)
+        Bonds = compute_bonds_system(Pos,Types,Lims=Lims)
+
+        N_Si,N_O = np.shape(Bonds)
+        Indices = (np.arange(0,N_Si).reshape(N_Si,1,1)*np.array([1,0]) + np.arange(0,N_O).reshape((1,N_O,1))*np.array([0,1])).reshape((N_Si*N_O,2))
+
+        Pos_Si = Pos[Types==1]
+        Pos_O = Pos[(Types==2) | (Types==3)]
+
+        Indices = Indices[Bonds.ravel()!=0]
+
+        tubes = [pv.Line(Pos_Si[i_si],Pos_O[i_o]) for i_si,i_o in Indices]
+        mesh = tubes[0].merge(tubes[1:])
+        plotter.add_mesh(mesh,line_width=10,color="gray")
 
     if Lims is not None:
         plotter.add_mesh(
