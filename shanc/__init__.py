@@ -34,4 +34,4 @@ from shanc.add_chromophore import *
 # - re: parsing text in XYZ/LAMMPS file headers
 # - defaultdict: convenient dictionary defaults for counters and maps
 
-__version__ = "0.0.1.1"
+__version__ = "0.0.1.2"
