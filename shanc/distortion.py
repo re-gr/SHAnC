@@ -778,6 +778,7 @@ def create_helix(self,
 
         enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
         # Transformation of the cuboid into the helix
+        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
 
         # Mapping of the indices between cast and surface
         Pos_transfo_int = Pos_transfo[mask_int]
