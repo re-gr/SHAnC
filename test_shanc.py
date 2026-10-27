@@ -29,12 +29,29 @@ def test_construction_helix():
     thickness = 10
     diameter = 30
     turns = 1
-    file_lattice = "demo_system//Analysis_example//sio2_pitch_200/beta_quartz.data"
+    file_lattice = "shanc//demo_system//Analysis_example//sio2_pitch_200/beta_quartz.data"
 
     helix = shanc.helix(pitch,width,thickness,diameter,turns,file_lattice)
     helix.create_helix()
-    print("Lims",helix.Lims)
-    helix.plot_structure_quick()
+    
+    #helix.plot_structure()
+    
+    #helix.plot_rdf_type1type2()
+    
+    #helix.plot_rdf_metal()
+    
+    #Issues here
+    #helix.save_defects()
+    
+    #helix.plot_analyze_defects()
+    
+    #helix.plot_analyze_density()
+    
+    #helix.analyze_plot_syst()
+    
+    #helix.visualize_structure_cast_surface_separation()
+    
+    #helix.visualize_close_contacts()
     assert 1
 
 test_construction_helix()

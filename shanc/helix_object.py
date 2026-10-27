@@ -186,7 +186,7 @@ class helix:
         """
         set_twist(twist)
 
-        Convert the helix into a twist (true) or not
+        Convert the helix into a twist (True) or not (False)
 
         Parameters
         ----------

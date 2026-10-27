@@ -223,7 +223,7 @@ def _auto_cap_params(Pos, Types, Lims, cation_type, anion_type, cutoff_factor = 
 
 
 
-def clean_structure(Pos, Types, Lims, N, periodic=True,
+def _clean_structure(Pos, Types, Lims, N, periodic=True,
                         cation_type=1, anion_type=2,
                         expected_coord=4,
                         bond_threshold=2.0,
@@ -427,9 +427,9 @@ def clean_structure(Pos, Types, Lims, N, periodic=True,
 # Geometric Helical transformation
 # ---------------------------------------------------------------------------
 
-def transfo(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10, enlarge_z=0, periodic=True,other_mapping=False,params_helix=[]):
+def geometric_transformation(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10, enlarge_z=0, periodic=True,other_mapping=False,params_helix=[]):
     """
-    transfo(Pos,D=0,rota=0,enlarge=10,periodic=True,circling=True,do_rota_transf=False)
+    geometric_transformation(Pos,D=0,rota=0,enlarge=10,periodic=True,circling=True,do_rota_transf=False)
 
     Do the coordinate transformations of the initial cuboid.
     The formula used for the circling is the elliptical grid mapping
@@ -543,7 +543,7 @@ def create_helix(self,
                 output_name_cast = "helix_cast.data", mass_map = {},  cap_missing=2):
 
     """
-    create_syst(rota,D,pitch,width,thickness,int_thick,clean_structure=True,periodic=True,circling=True,do_rota_transf=False,file_lattice="beta_quartz.data",do_angles=False)
+    create_syst(rota,D,pitch,width,thickness,int_thick,_clean_structure=True,periodic=True,circling=True,do_rota_transf=False,file_lattice="beta_quartz.data",do_angles=False)
 
     This functions creates the whole system using the dimensions stated.
     It creates two files : by default quartz_dupl.data and quartz_int.data which contains the data of the surface and the data of the cast respectively.
@@ -560,7 +560,7 @@ def create_helix(self,
             the width of the helix
         thickness : float
             the thickness of the helix
-        clean_structure : bool, optional
+        _clean_structure : bool, optional
             To clean or not the structure by adding H2O. By default True
         periodic : bool, optional
             do the creation of a periodic system after the transformation
@@ -718,7 +718,7 @@ def create_helix(self,
         # The slab contains 3 duplicates as to only take the inside when doing the cleaning
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx,Ny,3,Lims_lattice,Types_lattice,Pos_lattice)
         # visualize_cuboid(Pos, Types)
-        Pos, Types, Bonds_OH, _ = clean_structure(Pos, Types, Lims_lattice, N_list, periodic=True, cap_missing=cap_missing)
+        Pos, Types, Bonds_OH, _ = _clean_structure(Pos, Types, Lims_lattice, N_list, periodic=True, cap_missing=cap_missing)
 
         ##Add O and H to the mappings, SHOULD BE MORE GENERAL IN THE FUTURE
         mass_map[3] = 15.9994
@@ -784,7 +784,7 @@ def create_helix(self,
 
         enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
         # Transformation of the cuboid into the helix
-        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
+        Pos_transfo,Lims_tot = geometric_transformation(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
 
 
         from scipy.spatial import cKDTree
@@ -879,7 +879,7 @@ def create_helix(self,
 
         enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
         ## Transformation of the cuboid into the helix ##
-        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
+        Pos_transfo,Lims_tot = geometric_transformation(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
         Pos_transfo_int = []
         Types_int = []
         Pos_transfo_surf, Types_surf = Pos_transfo, Types
