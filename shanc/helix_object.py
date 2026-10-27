@@ -128,6 +128,45 @@ class helix:
             except:
                 print("Tried reading the lattice file but an unknown issue happened.")
 
+    
+    @property
+    def metal(self):
+        """LAMMPS type ids mapped to metallic elements."""
+        return tuple(
+            type_id for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str) and symbol.capitalize() in _METAL_ELEMENTS
+        )
+
+    @property
+    def oxide_anion_types(self):
+        """Type ids mapped to oxygen."""
+        return tuple(
+            type_id for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str) and symbol.capitalize() == "O"
+        )
+    
+    @property
+    def hydrogen_types(self):
+        """Type ids mapped to hydrogen."""
+        return tuple(
+            type_id for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str) and symbol.capitalize() == "H"
+        )
+
+    @property
+    def material(self):
+        """Infer whether the atom type map describes an oxide, metal, or other system."""
+        if self.oxide_anion_types:
+            return "oxide"
+        symbols = {
+            str(symbol).capitalize()
+            for symbol in self.type_map.values()
+            if isinstance(symbol, str)
+        }
+        if symbols and symbols <= _METAL_ELEMENTS:
+            return "metal"
+        return "unknown"
+
 
     def set_parameters(self, pitch, width, thickness, diameter, turns):
         """
