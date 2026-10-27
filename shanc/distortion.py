@@ -427,9 +427,9 @@ def _clean_structure(Pos, Types, Lims, N, periodic=True,
 # Geometric Helical transformation
 # ---------------------------------------------------------------------------
 
-def geometric_transformation(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10, enlarge_z=0, periodic=True,other_mapping=False,params_helix=[]):
+def _geometric_transformation(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10, enlarge_z=0, periodic=True,other_mapping=False,params_helix=[]):
     """
-    geometric_transformation(Pos,D=0,rota=0,enlarge=10,periodic=True,circling=True,do_rota_transf=False)
+    _geometric_transformation(Pos,D=0,rota=0,enlarge=10,periodic=True,circling=True,do_rota_transf=False)
 
     Do the coordinate transformations of the initial cuboid.
     The formula used for the circling is the elliptical grid mapping
@@ -778,7 +778,7 @@ def create_helix(self,
 
         enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
         # Transformation of the cuboid into the helix
-        Pos_transfo,Lims_tot = transfo(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
+        Pos_transfo,Lims_tot = _geometric_transformation(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
 
         # Mapping of the indices between cast and surface
         Pos_transfo_int = Pos_transfo[mask_int]
@@ -841,7 +841,7 @@ def create_helix(self,
 
         enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
         ## Transformation of the cuboid into the helix ##
-        Pos_transfo,Lims_tot = geometric_transformation(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
+        Pos_transfo,Lims_tot = _geometric_transformation(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
         Pos_transfo_int = []
         Types_int = []
         Pos_transfo_surf, Types_surf = Pos_transfo, Types
