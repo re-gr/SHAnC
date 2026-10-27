@@ -33,25 +33,6 @@ def test_construction_helix():
 
     helix = shanc.helix(pitch,width,thickness,diameter,turns,file_lattice)
     helix.create_helix()
-    
-    #helix.plot_structure()
-    
-    #helix.plot_rdf_type1type2()
-    
-    #helix.plot_rdf_metal()
-    
-    #Issues here
-    #helix.save_defects()
-    
-    #helix.plot_analyze_defects()
-    
-    #helix.plot_analyze_density()
-    
-    #helix.analyze_plot_syst()
-    
-    #helix.visualize_structure_cast_surface_separation()
-    
-    #helix.visualize_close_contacts()
+
     assert 1
 
-test_construction_helix()
