@@ -33,6 +33,7 @@ def test_construction_helix():
 
     helix = shanc.helix(pitch,width,thickness,diameter,turns,file_lattice)
     helix.create_helix()
+    print(helix.material)
     print("Lims",helix.Lims)
     helix.plot_structure_quick()
     assert 1
