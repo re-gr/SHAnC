@@ -611,10 +611,13 @@ def create_helix(self,
     Pos_lattice = self.Pos_lattice
     Types_lattice = self.Types_lattice
     Lims_lattice = self.Lims_lattice
+    material = self.material
+    
+    if material == "metal":
+        saturation = False
+    
     if (self.file_lattice.split("."))[-1] == "xyz":
         print("/!\\ Warning, you are trying to create an helix starting from a xyz file. This is not recommended as they don't contain the information of the cubic cell. A box was infered but could be wrong...")
-
-
 
     Lims_visu = [[np.max(Pos_lattice[:,0]), np.min(Pos_lattice[:,0])], [np.max(Pos_lattice[:,1]), np.min(Pos_lattice[:,1])], [np.max(Pos_lattice[:,2]), np.min(Pos_lattice[:,2])]]
     print("First RDF check on the FCC")
@@ -683,7 +686,6 @@ def create_helix(self,
     D_est = (-T+diameter) /2
     N = P / (P*P + D_est*D_est)**(1/2)
     b = abs(2*T*D_est / (W*W*N*N - T*T))
-    # print(b)
 
     if b > 1 :
         # The extremum point is the point in the external layer
@@ -709,7 +711,6 @@ def create_helix(self,
 
     if twist:
         D_transfo = 0
-    print("Old D", D_transfo, diameter)
 
     ##Surface
     if saturation:
@@ -756,13 +757,6 @@ def create_helix(self,
         ## Create slab form which we remove the duplicate atoms ##
         Pos, Types, Lims_tot, _a, _b = duplicate(Nx, Ny, Nz,Lims_lattice,Types_lattice,Pos_lattice)
 
-        # pitch_actual = Nz*lz
-        # Pos[:,2] *=pitch/pitch_actual
-        # Lims_tot[2] *=pitch/pitch_actual
-
-
-        # visualize_cuboid(Pos, Types, Lims_visu)
-
         Bonds_OH, Angles_OH = [], []
         Lims_visu = [[0,Nx*lx], [0, Ny*ly], [0, Nz*lz]]
         write_data("cuboid.data", Pos, Types, Lims=Lims_visu, Bonds_OH=Bonds_OH, mass_map=mass_map)
@@ -785,47 +779,16 @@ def create_helix(self,
         enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
         # Transformation of the cuboid into the helix
         Pos_transfo,Lims_tot = transfo(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
-
-
-        from scipy.spatial import cKDTree
-        # pairs = cKDTree(Pos).query_pairs(2.6, output_type='ndarray')
-        tree = cKDTree(Pos)
-        d_nn = np.median(tree.query(Pos, k=2)[0][:, 1])   # median 1st-neighbour distance
-        cutoff = 1.2 * d_nn                               # 2.6 for Cu-ish, ~3.46 for Au
-
-        pairs = tree.query_pairs(cutoff, output_type='ndarray')
-
-        if len(pairs) == 0:
-            print("No neighbour pairs found, skipping distortion check")
-        else:
-            i, j = pairs[:, 0], pairs[:, 1]
-            d0 = np.linalg.norm(Pos[i] - Pos[j], axis=1)
-            v = Pos_transfo[i] - Pos_transfo[j]
-            v[:, 2] -= pitch * np.round(v[:, 2] / pitch)       # periodic in z
-            d1 = np.linalg.norm(v, axis=1)
-            ratio = d1 / d0
-            print("ratio post/pre percentiles 1,5,50,95:", np.percentile(ratio, [1, 5, 50, 95]).round(3))
-            for k in np.argsort(ratio)[:10]:
-                print("types %d-%d  d0=%.3f  d1=%.3f  pre-pos %s" %
-                    (Types[i[k]], Types[j[k]], d0[k], d1[k], Pos[i[k]].round(2)))
-
-        print("Lims_tot", Lims_tot)
-        print("Lims_visu", Lims_visu)
-        # visualize_cuboid2(Pos_transfo, Types, cast_mask=mask_int)
+        
 
         # Mapping of the indices between cast and surface
         Pos_transfo_int = Pos_transfo[mask_int]
         Types_int = Types[mask_int]
         print("Cast after transformation")
-        # visualize_cuboid(Pos_transfo_int, Types_int)
-        # visualize_cuboid2(Pos_transfo_int, Types_int, cast=True)
-
 
         Pos_transfo_surf = Pos_transfo[mask_surf]
         Types_surf = Types[mask_surf]
         print("Surface after transformation")
-        # visualize_cuboid(Pos_transfo_surf, Types_surf)
-        # visualize_cuboid2(Pos_transfo_surf, Types_surf, cast=False)
 
         Ind_cut = mask_surf
         Ind_sum = np.cumsum(Ind_cut) - 1
