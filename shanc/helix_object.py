@@ -13,7 +13,7 @@ _METAL_ELEMENTS = frozenset(
 )
 
 
-class helix:
+class Helix:
     """
     Helix object
     """
@@ -83,7 +83,7 @@ class helix:
         Returns
         -------
             helix : helix
-                The helix object.
+                The Helix object.
         """
 
         self.pitch = pitch
