@@ -4,7 +4,7 @@ def test_helix():
     """
     test to create and modify the helix
     """
-    helix = shanc.helix()
+    helix = shanc.Helix()
 
     pitch = 10
     width = 10
@@ -31,7 +31,7 @@ def test_construction_helix():
     turns = 1
     file_lattice = "demo_system//Analysis_example//sio2_pitch_200/beta_quartz.data"
 
-    helix = shanc.helix(pitch,width,thickness,diameter,turns,file_lattice)
+    helix = shanc.Helix(pitch,width,thickness,diameter,turns,file_lattice)
     helix.create_helix()
     print(helix.material)
     print("Lims",helix.Lims)
