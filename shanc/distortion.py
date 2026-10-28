@@ -862,4 +862,4 @@ def create_helix(self,
     self.Lims_cast = Lims_tot
 
 
-helix.create_helix = create_helix
+Helix.create_helix = create_helix
