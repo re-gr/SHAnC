@@ -985,6 +985,7 @@ def read_structure_from_file(file, do_scale=True, atom_style="full"):
     return Atom_pos, Atom_types, Lims, mass_map, type_map
 
 
+
 def create_helix_from_file(file, do_scale=True, atom_style="full"):
     """
     read_structure_from_data(file, do_scale=True, atom_style="full")
@@ -995,6 +996,92 @@ def create_helix_from_file(file, do_scale=True, atom_style="full"):
     SHould be used to display after dynamics
 
     """
+    from shanc.helix_object import Helix
 
+    file_path = str(file_helix)
+    suffix = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
+
+    if suffix == "data":
+        positions, atom_types, limits, mass_map, inferred_type_map = (
+            read_structure_from_file(
+                file_path, do_scale=False, atom_style=atom_style
+            )
+        )
+        timestep = None
+    elif suffix == "xyz":
+        timesteps, _, boxes, atoms, type_maps = read_xyz(file_path)
+        if not len(atoms):
+            raise ValueError(f"No frames found in XYZ file {file_path!r}.")
+        try:
+            frame_index = range(len(atoms))[frame]
+        except IndexError as exc:
+            raise IndexError(
+                f"Frame index {frame} is out of range for {len(atoms)} XYZ frames."
+            ) from exc
+        atoms_frame = np.asarray(atoms[frame_index])
+        positions = atoms_frame[:, 2:5]
+        atom_types = atoms_frame[:, 1].astype(int)
+        limits = boxes[frame_index]
+        inferred_type_map = type_maps[frame_index]
+        mass_map = {
+            type_id: ELEMENT_MASSES[symbol]
+            for type_id, symbol in inferred_type_map.items()
+            if isinstance(symbol, str) and symbol in ELEMENT_MASSES
+        }
+        timestep = timesteps[frame_index]
+    elif suffix in {"lammpstrj", "dump", "lmp"}:
+        timesteps, _, boxes, atoms = read_dump(file_path, unscale=False)
+        if not len(atoms):
+            raise ValueError(f"No frames found in dump file {file_path!r}.")
+        try:
+            frame_index = range(len(atoms))[frame]
+        except IndexError as exc:
+            raise IndexError(
+                f"Frame index {frame} is out of range for {len(atoms)} dump frames."
+            ) from exc
+        atoms_frame = np.asarray(atoms[frame_index])
+        atom_types = atoms_frame[:, 1].astype(int)
+        limits = boxes[frame_index]
+        bounds = np.asarray(limits, dtype=float)
+        positions = (
+            atoms_frame[:, 2:5] * (bounds[:, 1] - bounds[:, 0])
+            + bounds[:, 0]
+        )
+        inferred_type_map = {}
+        mass_map = {}
+        timestep = timesteps[frame_index]
+        if data_file is not None:
+            _, _, _, mass_map, inferred_type_map = read_structure_from_file(
+                str(data_file), do_scale=False, atom_style=atom_style
+            )
+    else:
+        raise ValueError(
+            f"Unsupported helix file extension {suffix!r}; expected .data, "
+            ".xyz, .lammpstrj, .dump, or .lmp."
+        )
+
+    if type_map is not None:
+        inferred_type_map = {
+            int(type_id): symbol for type_id, symbol in type_map.items()
+        }
+
+    for type_id, symbol in inferred_type_map.items():
+        if (type_id not in mass_map and isinstance(symbol, str)
+                and symbol in ELEMENT_MASSES):
+            mass_map[type_id] = ELEMENT_MASSES[symbol]
+
+    result = Helix()
+    result.set_atoms(
+        np.asarray(positions, dtype=float),
+        np.asarray(atom_types, dtype=int),
+        np.asarray(limits, dtype=float),
+        [],
+        [],
+        inferred_type_map,
+        mass_map,
+    )
+    result.file_helix = file_path
+    result.timestep = timestep
+    result.periodic = bool(len(limits) == 3)
 
     return
