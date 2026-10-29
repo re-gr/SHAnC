@@ -20,7 +20,7 @@ class Helix:
 
     def __init__(self, pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = ""):
         """
-        helix(pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = "")
+        Helix(pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = "")
 
         Constructs the helix object containing the atoms and the casts.
         If one provides the "file_lattice", the lattice will be directly loaded.
