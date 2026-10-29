@@ -71,6 +71,11 @@ ELEMENT_RADIUS = dict_radii={
     'Db':1.55, 'Sg':1.55, 'Bh':1.55, 'Hs':1.56, 'Mt':1.56, 'Ds':1.6, 'Rg':1.6, 'Cn':1.6, 'Nh':1.6, 'Fl':1.6, 'Mc':1.6, 'Lv':1.6, 'Ts':1.6, 'Og':1.6
 }
 
+_PURPLE = np.array([96, 25, 255]) / 255
+_DARK_PURPLE = np.array([56, 20, 180]) / 255
+_DARK_DARK_PURPLE = np.array([34, 10, 120]) / 255
+
+
 # ---------------------------------------------------------------------------
 # Bond computation
 # ---------------------------------------------------------------------------
@@ -78,7 +83,8 @@ ELEMENT_RADIUS = dict_radii={
 def _compute_bonds(Pos, Types,
                   threshold_type1=2, threshold_type2=2, threshold_H=1.3,
                   do_count_type_3=True,
-                  cation_type=1, anion_type=2, metal = False):
+                  cation_type=1, anion_type=2, metal=False,
+                  hydroxyl_type=3, hydrogen_type=4):
     """
     Compute the bonds of an oxide system.
 
@@ -107,20 +113,24 @@ def _compute_bonds(Pos, Types,
     Bonds, Cat_count_An, An_count_Cat, O_count_H, H_count_O
     """
     if metal:
+        Pos_Cat = Pos[np.isin(Types, np.atleast_1d(cation_type))]
         Dist = sd.cdist(Pos_Cat, Pos_Cat)
         np.fill_diagonal(Dist, np.inf)
         Bonds = Dist < threshold_type1
         Cat_count_An = np.sum(Bonds, axis = 1)
         return Bonds, Cat_count_An, np.array([]), np.array([]), np.array([])
-    # Select atoms by type: cations, anions (including OH oxygens when requested), and hydrogens.
-    Pos_Cat = Pos[Types == cation_type]
 
-    if do_count_type_3:
-        Pos_An = Pos[(Types == anion_type) | (Types == 3)]
-    else:
-        Pos_An = Pos[Types == anion_type]
+    cation_mask = np.isin(Types, np.atleast_1d(cation_type))
+    anion_mask = np.isin(Types, np.atleast_1d(anion_type))
+    hydroxyl_mask = (
+        np.isin(Types, np.atleast_1d(hydroxyl_type))
+        if do_count_type_3 and hydroxyl_type is not None
+        else np.zeros(len(Types), dtype=bool)
+    )
+    Pos_Cat = Pos[cation_mask]
+    Pos_An = Pos[anion_mask | hydroxyl_mask]
 
-    Pos_H     = Pos[Types == 4]
+    Pos_H     = Pos[np.isin(Types, np.atleast_1d(hydrogen_type))]
     H_present = len(Pos_H) > 0
 
     # Compute all pairwise Cat-An distances and identify bonds by cutoff.
@@ -380,7 +390,8 @@ def compute_hist_neighbors(Pos, Types,
                            cube=100,
                            threshold_type1=2, threshold_type2=2, threshold_H=1.3,
                            periodic=True, Lims=[], rdf_max=5,
-                           cation_type=1, anion_type=2, metal = False):
+                           cation_type=1, anion_type=2, hydroxyl_type=3,
+                           metal=False):
     """
     Compute bond counts and RDF distances by slicing the system into sub-cubes.
 
@@ -395,8 +406,10 @@ def compute_hist_neighbors(Pos, Types,
     periodic        : bool   – apply z-periodic boundary, default True
     Lims            : list   – [[lx,Lx],[ly,Ly],[lz,Lz]], required for PBC
     rdf_max         : float  – RDF cutoff radius (Å), default 5
-    cation_type     : int    – type id of the cation, default 1
-    anion_type      : int    – type id of the anion,  default 2
+    cation_type     : int or sequence of int – cation type ID(s), default 1
+    anion_type      : int or sequence of int – anion type ID(s), default 2
+    hydroxyl_type   : int or sequence of int – hydroxyl oxygen type ID(s),
+                      default 3; use an empty sequence to exclude hydroxyls
 
     Returns
     -------
@@ -421,7 +434,16 @@ def compute_hist_neighbors(Pos, Types,
     Pos_added   = np.copy(Pos)
     Types_added = np.copy(Types)
 
-    Num_Cat_or = np.sum(Types == cation_type)
+    cation_types = np.atleast_1d(cation_type)
+    anion_types = np.atleast_1d(anion_type)
+    hydroxyl_types = (
+        np.atleast_1d(hydroxyl_type)
+        if hydroxyl_type is not None
+        else np.array([])
+    )
+    anion_group_types = np.concatenate((anion_types, hydroxyl_types))
+    cation_mask = np.isin(Types, cation_types)
+    anion_group_mask = np.isin(Types, anion_group_types)
 
     if periodic:
         Pos_add_z    = Pos[:, 2] > (Lz - rdf_max)
@@ -439,8 +461,8 @@ def compute_hist_neighbors(Pos, Types,
         ])
 
     Num_at  = len(Types)
-    Num_Cat = np.sum(Types == cation_type)
-    Num_An  = 0 if metal else np.sum((Types == anion_type) | (Types == 3))
+    Num_Cat = np.count_nonzero(cation_mask)
+    Num_An  = 0 if metal else np.count_nonzero(anion_group_mask)
     In_trunc = np.array(
         [True] * Num_at + [False] * (len(Pos_added) - Num_at), dtype=bool
     )
@@ -473,9 +495,9 @@ def compute_hist_neighbors(Pos, Types,
 
                 Ind_uniq_in_pad = (mask_u & In_trunc)[mask_p]
 
-                if not (np.any(Types_trunc == cation_type) and np.any(Types_trunc == anion_type)):
-                    continue
-                if not metal and not np.any(Types_trunc == cation_type):
+                has_cation = np.any(np.isin(Types_trunc, cation_types))
+                has_anion = np.any(np.isin(Types_trunc, anion_group_types))
+                if not has_cation or (not metal and not has_anion):
                     continue
 
                 _, Cat_count_An, An_count_Cat, _, _ = _compute_bonds(
@@ -486,33 +508,37 @@ def compute_hist_neighbors(Pos, Types,
                     do_count_type_3=True,
                     cation_type=cation_type,
                     anion_type=anion_type,
-                    metal = metal
+                    metal=metal,
+                    hydroxyl_type=hydroxyl_type,
                 )
 
-                cat_mask_pad = Types_trunc == cation_type
+                cat_mask_pad = np.isin(Types_trunc, cation_types)
 
                 Cat_count_An = Cat_count_An[Ind_uniq_in_pad[cat_mask_pad]]
-                cat_idx = mask_u[:Num_at][Types == cation_type]
+                cat_idx = mask_u[:Num_at][cation_mask]
                 Cat_count_An_tot[cat_idx] = Cat_count_An
 
                 if not metal:
-                    an_mask_pad  = (Types_trunc == anion_type) | (Types_trunc == 3)
+                    an_mask_pad = np.isin(Types_trunc, anion_group_types)
 
                     An_count_Cat = An_count_Cat[Ind_uniq_in_pad[an_mask_pad]]
-                    an_idx = mask_u[:Num_at][(Types == anion_type) | (Types == 3)]
+                    an_idx = mask_u[:Num_at][anion_group_mask]
                     An_count_Cat_tot[an_idx] = An_count_Cat
 
                 # Distances for RDF
-                Pos_Cat_u = Pos_trunc_uniq[Types_trunc_uniq == cation_type]
+                Pos_Cat_u = Pos_trunc_uniq[
+                    np.isin(Types_trunc_uniq, cation_types)
+                ]
                 if metal:
                     if len(Pos_Cat_u) < 2:
                         continue
                     D = sd.cdist(Pos_Cat_u, Pos_Cat_u)
                     np.fill_diagonal(D, np.inf)
                 else:
-                    Pos_An_u  = Pos_trunc_uniq[
-                        (Types_trunc_uniq == anion_type) | (Types_trunc_uniq == 3)
-                    ]
+                    anion_group_u = np.isin(
+                        Types_trunc_uniq, anion_group_types
+                    )
+                    Pos_An_u = Pos_trunc_uniq[anion_group_u]
                     if len(Pos_Cat_u) == 0 or len(Pos_An_u) == 0:
                         continue
                     D = sd.cdist(Pos_Cat_u, Pos_An_u)
@@ -827,9 +853,9 @@ def plot_rdf_cation_anion(self,threshold_type1=2, threshold_type2=2,
     )
     Dist_list = [k for j in Dist_list for k in j]
 
-    purple           = np.array([ 96,  25, 255]) / 255
-    dark_purple      = np.array([ 56,  20, 180]) / 255
-    dark_dark_purple = np.array([ 34,  10, 120]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
 
     fig, ax = plt.subplots()
     for spine in ax.spines.values():
@@ -977,9 +1003,9 @@ def plot_rdf_metal(self, type_id=None, cube=50, a_theory=4.078, bins=100, rdf_ma
                     mask = (Idx_pad != gi) & (D[local_i] > 0)
                     Dist_list.append(D[local_i][mask])
 
-    purple           = np.array([ 96,  25, 255]) / 255
-    dark_purple      = np.array([ 56,  20, 180]) / 255
-    dark_dark_purple = np.array([ 34,  10, 120]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
     Dist_flat        = np.concatenate(Dist_list) if Dist_list else np.array([])
 
     fig, ax = plt.subplots(figsize=(12, 10))
@@ -1132,8 +1158,9 @@ def plot_coordination_metal(self, type_id=None,
     if not plot:
         return report
 
-    purple      = np.array([ 96,  25, 255]) / 255
-    dark_purple = np.array([ 56,  20, 180]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
 
     cn_vals  = sorted(report['cn_counts'].keys())
     cn_freqs = [report['cn_counts'][c] for c in cn_vals]
@@ -1358,7 +1385,6 @@ def plot_coordination_oxide(self, cation=None, anion=None, cutoff=2.5,
 
 Helix.plot_coordination_oxide = plot_coordination_oxide
 
-
 # ---------------------------------------------------------------------------
 # Oxide analysis helpers (compute + plot)
 # ---------------------------------------------------------------------------
@@ -1455,8 +1481,9 @@ def analyze_mult(list_Tstep, list_Pos, list_Types,
     anion_type    : int   – type id of the anion,  default 2
     """
 
-    purple      = np.array([ 96,  25, 255]) / 255
-    dark_purple = np.array([ 56,  20, 180]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
 
     fig, ax = plt.subplots()
     if save:
