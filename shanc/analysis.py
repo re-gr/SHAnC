@@ -2081,8 +2081,13 @@ def plot_structure(self, point_size=12, type_colors=None,
         lines = np.hstack([[2, i_si, i_o] for i_si, i_o in Bonds])
         mesh.lines = lines
 
-        if do_fancy: plotter.add_mesh(mesh, color="gray", pbr=True,roughness=.5,metallic=.2,line_width=5)
-        else: plotter.add_mesh(mesh, color="gray", lighting=False,line_width=5)
+
+
+        if do_fancy:
+            tube = mesh.tube(radius=0.1)
+            plotter.add_mesh(tube, color="gray", pbr=True,roughness=.5,metallic=.2,line_width=5)
+        else:
+            plotter.add_mesh(mesh, color="gray", lighting=False,line_width=5)
 
 
 
