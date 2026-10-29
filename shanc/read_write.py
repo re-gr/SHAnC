@@ -346,7 +346,9 @@ def read_dump(dump_file, unscale=False):
         list_ATOMS[:, :, 2:] = list_ATOMS[:, :, 2:] - C_min
         list_ATOMS[:, :, 2] = list_ATOMS[:, :, 2] % Lx
         list_ATOMS[:, :, 3] = list_ATOMS[:, :, 3] % Ly
-        list_ATOMS[:, :, 4] = (list_ATOMS[:, :, 4] - BOX[2][0]) % Lz + BOX[2][0]
+        list_ATOMS[:, :, 4] = (list_ATOMS[:, :, 4] - BOX[2][0]) % Lz
+
+        list_BOX[-1] = [[0,Lx],[0,Ly],[0,Lz]]
 
     return list_TSTEP, list_NUM_AT, list_BOX, np.array(list_ATOMS)
 
