@@ -79,6 +79,7 @@ def test_analysis_metal():
 
 test_read()
 test_analysis_oxide()
+test_analysis_metal()
 
 
 
