@@ -151,7 +151,16 @@ class Helix:
             type_id for type_id, symbol in self.type_map.items()
             if isinstance(symbol, str) and symbol.capitalize() == "O"
         )
-    
+
+    @property
+    def oxide_cation_types(self):
+        """Type ids mapped to non-oxygen, non-hydrogen oxide species."""
+        return tuple(
+            type_id for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str)
+            and symbol.capitalize() not in {"O", "H"}
+        )
+        
     @property
     def hydrogen_types(self):
         """Type ids mapped to hydrogen."""
