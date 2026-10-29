@@ -272,7 +272,7 @@ def compute_bonds_system(Pos, Types,
                            cube=30,
                            threshold_type1=2, threshold_type2=2, threshold_H=1.3,
                            periodic=True, Lims=[], rdf_max=5,
-                           cation_type=1, anion_type=2, metal = False):
+                           cation_type=1, anion_type=2, metal = False, indices = True):
     """
     Compute bond counts and RDF distances by slicing the system into sub-cubes.
 
@@ -340,8 +340,18 @@ def compute_bonds_system(Pos, Types,
         [True] * Num_at + [False] * (len(Pos_added) - Num_at), dtype=bool
     )
 
+    if indices:
+        Bonds = []
+        Index = np.arange(len(Pos_added))
 
-    Bonds = np.zeros((Num_Cat,Num_An))
+        if periodic:
+            Index_small = np.arange(len(Pos))
+            Index_add = np.concatenate([Index_small[Pos_add_z],Index_small[Pos_remove_z]])
+            Index[len(Pos):] = Index_add
+
+
+    else:
+        Bonds = np.zeros((Num_Cat,Num_An))
 
     for x in range(Nx):
         for y in range(Ny):
@@ -372,18 +382,35 @@ def compute_bonds_system(Pos, Types,
                     metal = metal
                 )
 
-
                 mask_Cat_p = Types_trunc == cation_type
                 mask_An_p = (Types_trunc == anion_type) | (Types_trunc == 3) #TO CHANGE TOO SPECIFIC
 
-                # print(np.shape(In_trunc[mask_p]),np.shape(In_trunc[mask_p][mask_Cat_p]),np.shape())
-                bonds_in = bonds[In_trunc[mask_p][mask_Cat_p]][:,In_trunc[mask_p][mask_An_p]]
+                if indices:
+                    index_cat_p = Index[mask_p][mask_Cat_p]
+                    index_an_p = Index[mask_p][mask_An_p]
+                    n_index_cat_p = len(index_cat_p)
+                    n_index_an_p = len(index_an_p)
+                    index_bonds_p = (index_cat_p.reshape((n_index_cat_p,1,1)) * np.array([[1,0]]) + index_an_p.reshape((1,n_index_an_p,1)) * np.array([[0,1]])).reshape((n_index_cat_p*n_index_an_p,2))
+                    index_bonds_p = index_bonds_p[bonds.ravel()!=0]
 
-                Bonds_Cat = Bonds[mask_p[In_trunc][mask_Cat]]
-                Bonds_Cat[:,mask_p[In_trunc][mask_An]] += bonds_in
-                Bonds[mask_p[In_trunc][mask_Cat]] = Bonds_Cat
+                    for index_b in index_bonds_p:
+                        Bonds.append(index_b)
 
-    return Bonds
+
+
+                else:
+
+                    # print(np.shape(In_trunc[mask_p]),np.shape(In_trunc[mask_p][mask_Cat_p]),np.shape())
+                    bonds_in = bonds[In_trunc[mask_p][mask_Cat_p]][:,In_trunc[mask_p][mask_An_p]]
+
+                    ##########FORGOT TO ADD BACK PERIODIC BONDS###########
+
+                    Bonds_Cat = Bonds[mask_p[In_trunc][mask_Cat]]
+                    Bonds_Cat[:,mask_p[In_trunc][mask_An]] += bonds_in
+                    Bonds[mask_p[In_trunc][mask_Cat]] = Bonds_Cat
+
+
+    return np.array(Bonds)
 
 
 def compute_hist_neighbors(Pos, Types,
@@ -551,7 +578,7 @@ def compute_hist_neighbors(Pos, Types,
 
 
 # ---------------------------------------------------------------------------
-# Helpers Atom type resolve 
+# Helpers Atom type resolve
 # ---------------------------------------------------------------------------
 
 def _require_material(self, expected):
@@ -710,7 +737,7 @@ def _mean_nearest_pair_distance(Pos, Types, source_types, target_types,
                                 periodic=False, Lims=None,
                                 exclude_same_atoms=False):
     """Return the mean nearest-target distance for each selected source atom.
-    
+
     Pos : array_like, shape (N, 3)
         Cartesian atom coordinates.
     Types : array_like, shape (N,)
@@ -732,7 +759,7 @@ def _mean_nearest_pair_distance(Pos, Types, source_types, target_types,
         Mean nearest-target distance.
 
     """
-                                    
+
     Pos = np.asarray(Pos, dtype=float)
     Types = np.asarray(Types)
     source_indices = np.flatnonzero(np.isin(Types, source_types))
@@ -920,7 +947,7 @@ def plot_rdf_metal(self, type_id=None, cube=50, a_theory=4.078, bins=100, rdf_ma
                     use the mean nearest metal–metal distance
     font_weight, title_font_weight : str – matplotlib font weight strings
     """
-                       
+
 
     _require_material(self, "metal")
     Pos = self.Pos
@@ -2003,6 +2030,7 @@ def plot_structure(self, point_size=12, type_colors=None,
     Pos = self.Pos
     Types = self.Types
     Lims = self.Lims
+    periodic=self.periodic
 
     ##TO ADD CAST PLOTTING
 
@@ -2042,33 +2070,20 @@ def plot_structure(self, point_size=12, type_colors=None,
         if do_fancy: plotter.add_mesh(mesh, color=color, pbr=True,roughness=.5,metallic=.2)
         else: plotter.add_mesh(mesh, color=color, lighting=False)
 
+
+
     if draw_bonds:
 
         mesh = pv.PolyData(Pos.astype(float))
 
-        Bonds = compute_bonds_system(Pos,Types,Lims=Lims)
+        Bonds = compute_bonds_system(Pos,Types,Lims=Lims,periodic=periodic)
 
-        N_at = np.shape(Pos)[0]
-        Bonds_all = np.zeros((N_at,N_at))
-        N_Cat = np.sum(Types==1)
-        Bonds_inter = np.zeros((N_Cat,N_at))
-        mask_Cat = (Types==1)
-        mask_An = (Types==2) | (Types==3)
-
-        Bonds_inter[:,mask_An] = Bonds
-        Bonds_all[mask_Cat] = Bonds_inter
-
-
-        Indices = (np.arange(0,N_at).reshape(N_at,1,1)*np.array([1,0]) + np.arange(0,N_at).reshape((1,N_at,1))*np.array([0,1])).reshape((N_at*N_at,2))
-
-
-        Indices = Indices[Bonds_all.ravel()!=0]
-
-        lines = np.hstack([[2, i_si, i_o] for i_si, i_o in Indices])
+        lines = np.hstack([[2, i_si, i_o] for i_si, i_o in Bonds])
         mesh.lines = lines
 
         if do_fancy: plotter.add_mesh(mesh, color="gray", pbr=True,roughness=.5,metallic=.2,line_width=5)
         else: plotter.add_mesh(mesh, color="gray", lighting=False,line_width=5)
+
 
 
     if Lims is not None:
@@ -2084,5 +2099,3 @@ def plot_structure(self, point_size=12, type_colors=None,
     plotter.show()
 
 Helix.plot_structure = plot_structure
-
-
