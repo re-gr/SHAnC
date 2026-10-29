@@ -6,7 +6,14 @@ Helix object definition for SHAnC
 from shanc.read_write import *
 
 
-class helix:
+_METAL_ELEMENTS = frozenset(
+    "Li Be Na Mg Al K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd "
+    "Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi "
+    "Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv".split()
+)
+
+
+class Helix:
     """
     Helix object
     """
@@ -76,7 +83,7 @@ class helix:
         Returns
         -------
             helix : helix
-                The helix object.
+                The Helix object.
         """
 
         self.pitch = pitch
@@ -143,6 +150,16 @@ class helix:
         return tuple(
             type_id for type_id, symbol in self.type_map.items()
             if isinstance(symbol, str) and symbol.capitalize() == "O"
+        )
+
+
+    @property
+    def oxide_cation_types(self):
+        """Type ids mapped to non-oxygen, non-hydrogen oxide species."""
+        return tuple(
+            type_id for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str)
+            and symbol.capitalize() not in {"O", "H"}
         )
 
     @property

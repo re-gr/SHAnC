@@ -71,6 +71,11 @@ ELEMENT_RADIUS = dict_radii={
     'Db':1.55, 'Sg':1.55, 'Bh':1.55, 'Hs':1.56, 'Mt':1.56, 'Ds':1.6, 'Rg':1.6, 'Cn':1.6, 'Nh':1.6, 'Fl':1.6, 'Mc':1.6, 'Lv':1.6, 'Ts':1.6, 'Og':1.6
 }
 
+_PURPLE = np.array([96, 25, 255]) / 255
+_DARK_PURPLE = np.array([56, 20, 180]) / 255
+_DARK_DARK_PURPLE = np.array([34, 10, 120]) / 255
+
+
 # ---------------------------------------------------------------------------
 # Bond computation
 # ---------------------------------------------------------------------------
@@ -78,7 +83,8 @@ ELEMENT_RADIUS = dict_radii={
 def _compute_bonds(Pos, Types,
                   threshold_type1=2, threshold_type2=2, threshold_H=1.3,
                   do_count_type_3=True,
-                  cation_type=1, anion_type=2, metal = False):
+                  cation_type=1, anion_type=2, metal=False,
+                  hydroxyl_type=3, hydrogen_type=4):
     """
     Compute the bonds of an oxide system.
 
@@ -107,20 +113,24 @@ def _compute_bonds(Pos, Types,
     Bonds, Cat_count_An, An_count_Cat, O_count_H, H_count_O
     """
     if metal:
+        Pos_Cat = Pos[np.isin(Types, np.atleast_1d(cation_type))]
         Dist = sd.cdist(Pos_Cat, Pos_Cat)
         np.fill_diagonal(Dist, np.inf)
         Bonds = Dist < threshold_type1
         Cat_count_An = np.sum(Bonds, axis = 1)
         return Bonds, Cat_count_An, np.array([]), np.array([]), np.array([])
-    # Select atoms by type: cations, anions (including OH oxygens when requested), and hydrogens.
-    Pos_Cat = Pos[Types == cation_type]
 
-    if do_count_type_3:
-        Pos_An = Pos[(Types == anion_type) | (Types == 3)]
-    else:
-        Pos_An = Pos[Types == anion_type]
+    cation_mask = np.isin(Types, np.atleast_1d(cation_type))
+    anion_mask = np.isin(Types, np.atleast_1d(anion_type))
+    hydroxyl_mask = (
+        np.isin(Types, np.atleast_1d(hydroxyl_type))
+        if do_count_type_3 and hydroxyl_type is not None
+        else np.zeros(len(Types), dtype=bool)
+    )
+    Pos_Cat = Pos[cation_mask]
+    Pos_An = Pos[anion_mask | hydroxyl_mask]
 
-    Pos_H     = Pos[Types == 4]
+    Pos_H     = Pos[np.isin(Types, np.atleast_1d(hydrogen_type))]
     H_present = len(Pos_H) > 0
 
     # Compute all pairwise Cat-An distances and identify bonds by cutoff.
@@ -257,11 +267,7 @@ def compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold
     return Bonds_tot_or
 
 
-# ---------------------------------------------------------------------------
 # Neighbour histogram (scalable, periodic-aware)
-# ---------------------------------------------------------------------------
-
-
 def compute_bonds_system(Pos, Types,
                            cube=30,
                            threshold_type1=2, threshold_type2=2, threshold_H=1.3,
@@ -384,7 +390,8 @@ def compute_hist_neighbors(Pos, Types,
                            cube=100,
                            threshold_type1=2, threshold_type2=2, threshold_H=1.3,
                            periodic=True, Lims=[], rdf_max=5,
-                           cation_type=1, anion_type=2, metal = False):
+                           cation_type=1, anion_type=2, hydroxyl_type=3,
+                           metal=False):
     """
     Compute bond counts and RDF distances by slicing the system into sub-cubes.
 
@@ -399,8 +406,10 @@ def compute_hist_neighbors(Pos, Types,
     periodic        : bool   – apply z-periodic boundary, default True
     Lims            : list   – [[lx,Lx],[ly,Ly],[lz,Lz]], required for PBC
     rdf_max         : float  – RDF cutoff radius (Å), default 5
-    cation_type     : int    – type id of the cation, default 1
-    anion_type      : int    – type id of the anion,  default 2
+    cation_type     : int or sequence of int – cation type ID(s), default 1
+    anion_type      : int or sequence of int – anion type ID(s), default 2
+    hydroxyl_type   : int or sequence of int – hydroxyl oxygen type ID(s),
+                      default 3; use an empty sequence to exclude hydroxyls
 
     Returns
     -------
@@ -425,7 +434,16 @@ def compute_hist_neighbors(Pos, Types,
     Pos_added   = np.copy(Pos)
     Types_added = np.copy(Types)
 
-    Num_Cat_or = np.sum(Types == cation_type)
+    cation_types = np.atleast_1d(cation_type)
+    anion_types = np.atleast_1d(anion_type)
+    hydroxyl_types = (
+        np.atleast_1d(hydroxyl_type)
+        if hydroxyl_type is not None
+        else np.array([])
+    )
+    anion_group_types = np.concatenate((anion_types, hydroxyl_types))
+    cation_mask = np.isin(Types, cation_types)
+    anion_group_mask = np.isin(Types, anion_group_types)
 
     if periodic:
         Pos_add_z    = Pos[:, 2] > (Lz - rdf_max)
@@ -443,8 +461,8 @@ def compute_hist_neighbors(Pos, Types,
         ])
 
     Num_at  = len(Types)
-    Num_Cat = np.sum(Types == cation_type)
-    Num_An  = 0 if metal else np.sum((Types == anion_type) | (Types == 3))
+    Num_Cat = np.count_nonzero(cation_mask)
+    Num_An  = 0 if metal else np.count_nonzero(anion_group_mask)
     In_trunc = np.array(
         [True] * Num_at + [False] * (len(Pos_added) - Num_at), dtype=bool
     )
@@ -477,9 +495,9 @@ def compute_hist_neighbors(Pos, Types,
 
                 Ind_uniq_in_pad = (mask_u & In_trunc)[mask_p]
 
-                if not (np.any(Types_trunc == cation_type) and np.any(Types_trunc == anion_type)):
-                    continue
-                if not metal and not np.any(Types_trunc == cation_type):
+                has_cation = np.any(np.isin(Types_trunc, cation_types))
+                has_anion = np.any(np.isin(Types_trunc, anion_group_types))
+                if not has_cation or (not metal and not has_anion):
                     continue
 
                 _, Cat_count_An, An_count_Cat, _, _ = _compute_bonds(
@@ -490,33 +508,37 @@ def compute_hist_neighbors(Pos, Types,
                     do_count_type_3=True,
                     cation_type=cation_type,
                     anion_type=anion_type,
-                    metal = metal
+                    metal=metal,
+                    hydroxyl_type=hydroxyl_type,
                 )
 
-                cat_mask_pad = Types_trunc == cation_type
+                cat_mask_pad = np.isin(Types_trunc, cation_types)
 
                 Cat_count_An = Cat_count_An[Ind_uniq_in_pad[cat_mask_pad]]
-                cat_idx = mask_u[:Num_at][Types == cation_type]
+                cat_idx = mask_u[:Num_at][cation_mask]
                 Cat_count_An_tot[cat_idx] = Cat_count_An
 
                 if not metal:
-                    an_mask_pad  = (Types_trunc == anion_type) | (Types_trunc == 3)
+                    an_mask_pad = np.isin(Types_trunc, anion_group_types)
 
                     An_count_Cat = An_count_Cat[Ind_uniq_in_pad[an_mask_pad]]
-                    an_idx = mask_u[:Num_at][(Types == anion_type) | (Types == 3)]
+                    an_idx = mask_u[:Num_at][anion_group_mask]
                     An_count_Cat_tot[an_idx] = An_count_Cat
 
                 # Distances for RDF
-                Pos_Cat_u = Pos_trunc_uniq[Types_trunc_uniq == cation_type]
+                Pos_Cat_u = Pos_trunc_uniq[
+                    np.isin(Types_trunc_uniq, cation_types)
+                ]
                 if metal:
                     if len(Pos_Cat_u) < 2:
                         continue
                     D = sd.cdist(Pos_Cat_u, Pos_Cat_u)
                     np.fill_diagonal(D, np.inf)
                 else:
-                    Pos_An_u  = Pos_trunc_uniq[
-                        (Types_trunc_uniq == anion_type) | (Types_trunc_uniq == 3)
-                    ]
+                    anion_group_u = np.isin(
+                        Types_trunc_uniq, anion_group_types
+                    )
+                    Pos_An_u = Pos_trunc_uniq[anion_group_u]
                     if len(Pos_Cat_u) == 0 or len(Pos_An_u) == 0:
                         continue
                     D = sd.cdist(Pos_Cat_u, Pos_An_u)
@@ -527,14 +549,261 @@ def compute_hist_neighbors(Pos, Types,
     return Dist_list, Cat_count_An_tot[:Num_Cat], An_count_Cat_tot[:Num_An]
 
 
+
+# ---------------------------------------------------------------------------
+# Helpers Atom type resolve 
+# ---------------------------------------------------------------------------
+
+def _require_material(self, expected):
+    if self.material != expected:
+        raise ValueError(
+            f"{expected.capitalize()} analysis requires a {expected} type_map; "
+            f"this helix is {self.material!r}."
+        )
+
+
+def _resolve_type_ids(self, selector, defaults, role):
+    """Resolve a role selection from symbols or validate explicit type IDs."""
+    if selector is None:
+        return tuple(int(type_id) for type_id in defaults)
+
+    if isinstance(selector, str):
+        requested = selector.casefold()
+        selected = tuple(
+            int(type_id) for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str) and symbol.casefold() == requested
+        )
+    else:
+        selected = tuple(int(type_id) for type_id in np.atleast_1d(selector))
+        missing = [type_id for type_id in selected if type_id not in self.type_map]
+        if missing:
+            raise ValueError(f"{role} type ID(s) {missing} are not in helix.type_map.")
+
+    if not selected:
+        raise ValueError(f"Could not resolve {role} selection {selector!r} from helix.type_map.")
+    return selected
+
+
+def _oxide_analysis_types(self, cation_type=None, anion_type=None, hydrogen_type=None):
+    """Resolve oxide role IDs from the helix type map."""
+    _require_material(self, "oxide")
+    cations = _resolve_type_ids(
+        self, cation_type, self.oxide_cation_types, "cation"
+    )
+    anions = _resolve_type_ids(
+        self, anion_type, self.oxide_anion_types, "anion"
+    )
+    hydrogens = _resolve_type_ids(
+        self, hydrogen_type, self.hydrogen_types, "hydrogen"
+    ) if hydrogen_type is not None or self.hydrogen_types else ()
+    if not cations or not anions:
+        raise ValueError(
+            "Oxide analysis requires at least one cation type and one anion type "
+            "in helix.type_map."
+        )
+    return cations, anions, hydrogens
+
+
+def _metal_type_ids(self, type_id=None):
+    """Resolve the metallic types to analyse, validating an optional selection."""
+    if self.material != "metal":
+        raise ValueError(
+            f"Metal analysis requires a metal type_map; this helix is {self.material!r}."
+        )
+    metal_types = tuple(int(type_id) for type_id in self.metal)
+    if type_id is not None:
+        if isinstance(type_id, str) and not type_id.isdecimal():
+            selected = tuple(
+                int(mapped_id) for mapped_id, symbol in self.type_map.items()
+                if isinstance(symbol, str) and symbol.casefold() == type_id.casefold()
+            )
+            if not selected or any(mapped_id not in metal_types for mapped_id in selected):
+                raise ValueError(f"type_id={type_id!r} is not mapped to a metal element.")
+            return selected
+        selected_id = int(type_id)
+        if selected_id not in metal_types:
+            raise ValueError(f"type_id={type_id} is not mapped to a metal element.")
+        return (selected_id,)
+    return metal_types
+
+def _type_labels(self, type_ids):
+    """Return readable element labels for selected type IDs."""
+    return ", ".join(
+        str(self.type_map.get(type_id, f"type {type_id}"))
+        for type_id in type_ids
+    )
+
+def _resolve_type_ids(self, selector, defaults, role):
+    """
+    Resolve a type selector into validated type IDs.
+
+    Parameters
+    ----------
+    self : Helix
+        Helix object containing the type map.
+    selector : str, int, sequence, or None
+        Element symbol or type ID selection. ``None`` uses ``defaults``.
+    defaults : sequence of int
+        Type IDs to use when no selector is specified.
+    role : str
+        Role name used in validation errors.
+
+    Returns
+    -------
+    tuple of int
+        Resolved type IDs.
+
+    Raises
+    ------
+    ValueError
+        If the selection cannot be resolved from the helix type map.
+    """
+    if selector is None:
+        return tuple(int(type_id) for type_id in defaults)
+
+    if isinstance(selector, str):
+        requested = selector.casefold()
+        selected = tuple(
+            int(type_id) for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str) and symbol.casefold() == requested
+        )
+    else:
+        selected = tuple(int(type_id) for type_id in np.atleast_1d(selector))
+        missing = [type_id for type_id in selected if type_id not in self.type_map]
+        if missing:
+            raise ValueError(f"{role} type ID(s) {missing} are not in helix.type_map.")
+
+    if not selected:
+        raise ValueError(f"Could not resolve {role} selection {selector!r} from helix.type_map.")
+    return selected
+
+def _periodic_images_z(Pos, Lims, margin):
+    """
+    Create z-periodic images of atoms near the box boundaries.
+
+    Parameters
+    ----------
+    Pos : array_like, shape (N, 3)
+        Cartesian atom coordinates.
+    Lims : array_like
+        Box limits in ``[[xlo, xhi], [ylo, yhi], [zlo, zhi]]`` form.
+    margin : float
+        Boundary distance within which atoms are copied.
+
+    Returns
+    -------
+    tuple
+        Coordinates including images and source atom indices. Original atoms
+        precede the images.
+    """
+    lz, Lz = Lims[2]
+    Dz = Lz - lz
+    top = np.where(Pos[:, 2] > Lz - margin)[0]
+    bot = np.where(Pos[:, 2] < lz + margin)[0]
+    Pos_all = np.vstack([Pos, Pos[top] - [0, 0, Dz], Pos[bot] + [0, 0, Dz]])
+    return Pos_all, np.concatenate([np.arange(len(Pos)), top, bot])
+
 # ---------------------------------------------------------------------------
 # RDF plots
 # ---------------------------------------------------------------------------
+def _mean_nearest_pair_distance(Pos, Types, source_types, target_types,
+                                periodic=False, Lims=None,
+                                exclude_same_atoms=False):
+    """Return the mean nearest-target distance for each selected source atom.
+    
+    Pos : array_like, shape (N, 3)
+        Cartesian atom coordinates.
+    Types : array_like, shape (N,)
+        Atom type IDs.
+    source_types : int or sequence of int
+        Type IDs whose nearest-target distances are averaged.
+    target_types : int or sequence of int
+        Type IDs that provide candidate neighbours.
+    periodic : bool, default=False
+        Apply periodic images along z when box limits are available.
+    Lims : array_like, optional
+        Box limits in ``[[xlo, xhi], [ylo, yhi], [zlo, zhi]]`` form.
+    exclude_same_atoms : bool, default=False
+        Exclude each source atom itself from target candidates.
 
-def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
+    Returns
+    -------
+    float
+        Mean nearest-target distance.
+
+    """
+                                    
+    Pos = np.asarray(Pos, dtype=float)
+    Types = np.asarray(Types)
+    source_indices = np.flatnonzero(np.isin(Types, source_types))
+    target_indices = np.flatnonzero(np.isin(Types, target_types))
+    if not len(source_indices):
+        raise ValueError("Cannot determine an automatic vline: no source atoms found.")
+    if not len(target_indices):
+        raise ValueError("Cannot determine an automatic vline: no target atoms found.")
+    if exclude_same_atoms and len(target_indices) < 2:
+        raise ValueError(
+            "Cannot determine a metal nearest-neighbour vline with fewer than "
+            "two selected atoms."
+        )
+
+    target_positions = Pos[target_indices]
+    target_atom_indices = target_indices
+    if periodic and (Lims is None or len(Lims) == 0):
+        periodic = False
+    if periodic:
+        if len(Lims) < 3:
+            raise ValueError(
+                "Cannot determine an automatic vline with periodic boundaries "
+                "without three box limits."
+            )
+        z_min, z_max = np.asarray(Lims, dtype=float)[2]
+        z_period = z_max - z_min
+        if z_period <= 0:
+            raise ValueError("The periodic z box limit must have positive length.")
+        target_positions = np.vstack((
+            target_positions,
+            target_positions + [0, 0, z_period],
+            target_positions - [0, 0, z_period],
+        ))
+        target_atom_indices = np.tile(target_indices, 3)
+
+    tree = cKDTree(target_positions)
+    source_positions = Pos[source_indices]
+    if not exclude_same_atoms:
+        distances, _ = tree.query(source_positions, k=1)
+        nearest_distances = np.asarray(distances)
+    else:
+        # Query increasingly many candidates until each source has a target
+        # other than itself; periodic images retain their original atom ID.
+        nearest_distances = np.full(len(source_indices), np.inf)
+        k = min(4, len(target_atom_indices))
+        while True:
+            distances, candidates = tree.query(source_positions, k=k)
+            distances = np.asarray(distances).reshape(len(source_indices), -1)
+            candidates = np.asarray(candidates).reshape(len(source_indices), -1)
+            candidate_atom_indices = target_atom_indices[candidates]
+            valid = candidate_atom_indices != source_indices[:, None]
+            for row in np.flatnonzero(np.any(valid, axis=1)):
+                nearest_distances[row] = distances[row, valid[row]][0]
+            unresolved = ~np.isfinite(nearest_distances)
+            if not np.any(unresolved):
+                break
+            if k == len(target_atom_indices):
+                raise ValueError(
+                    "Could not determine a non-self nearest-neighbour distance."
+                )
+            k = min(2 * k, len(target_atom_indices))
+
+    if not np.all(np.isfinite(nearest_distances)):
+        raise ValueError("Could not determine finite nearest-neighbour distances.")
+    return round(float(np.mean(nearest_distances)), 2)
+
+
+def plot_rdf_cation_anion(self,threshold_type1=2, threshold_type2=2,
                         rdf_max=3.2,
-                        vline=1.95, density=True,
-                        cation_type=1, anion_type=2,
+                        vline=None, density=True,
+                        cation_type=None, anion_type=None,
                         title=None,
                         font_weight='normal',
                         title_font_weight='normal'):
@@ -547,7 +816,8 @@ def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
     rdf_max         : float  – x-axis upper limit (Å)
     periodic        : bool   – use z-PBC
     Lims            : list   – system limits (required for PBC)
-    vline           : float  – vertical reference line position (Å)
+    vline           : float or None – reference line position (Å); when None,
+                      use the mean nearest cation–anion distance
     density         : bool   – normalise to g(r); False = raw counts
     cation_type     : int    – type id of the cation, default 1
     anion_type      : int    – type id of the anion,  default 2
@@ -556,24 +826,36 @@ def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
     title_font_weight : str  – title font weight
     """
 
-    print("TO REview")
+    _require_material(self, "oxide")
 
     Pos = self.Pos
     Types = self.Types
     Lims = self.Lims
     periodic = self.periodic
+    cation_types, anion_types, _ = _oxide_analysis_types(
+        self, cation_type, anion_type
+    )
+
+    cation_label = _type_labels(self, cation_types)
+    anion_label = _type_labels(self, anion_types)
+
+    if vline is None:
+        vline = _mean_nearest_pair_distance(
+            Pos, Types, cation_types, anion_types,
+            periodic=periodic and len(Lims) > 0, Lims=Lims,
+        )
 
     Dist_list, _, _ = compute_hist_neighbors(
         Pos, Types,
         threshold_type1=threshold_type1, threshold_type2=threshold_type2,
         periodic=periodic, Lims=Lims, rdf_max=rdf_max,
-        cation_type=cation_type, anion_type=anion_type,
+        cation_type=cation_types, anion_type=anion_types, hydroxyl_type=(),
     )
     Dist_list = [k for j in Dist_list for k in j]
 
-    purple           = np.array([ 96,  25, 255]) / 255
-    dark_purple      = np.array([ 56,  20, 180]) / 255
-    dark_dark_purple = np.array([ 34,  10, 120]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
 
     fig, ax = plt.subplots()
     for spine in ax.spines.values():
@@ -587,37 +869,40 @@ def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
     if density:
         radius = ((np.roll(edges, 1) + edges) / 2)[1:]
         dr  = radius[1] - radius[0]
-        g_r = counts / ((4 * np.pi * radius**2 * dr) * np.sum(Types == cation_type))
+        g_r = counts / (
+            (4 * np.pi * radius**2 * dr)
+            * np.sum(np.isin(Types, cation_types))
+        )
         for rect, val in zip(patches, g_r):
             rect.set_height(val)
-        ax.set_ylabel("g(r)", color='black', weight=font_weight, fontsize=30)
+        ax.set_ylabel("g(r)", color='black', weight=font_weight, fontsize=20)
         ax.set_ylim(0, 2)
     else:
-        ax.set_ylabel("Number", color='black', weight=font_weight, fontsize=30)
+        ax.set_ylabel("Number", color='black', weight=font_weight, fontsize=20)
 
-    plot_title = title if title else f"RDF type{cation_type}–type{anion_type}"
-    ax.set_title(plot_title, color='black', weight=title_font_weight, fontsize=30)
-    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=30)
+    plot_title = title if title else f"RDF {cation_label}–{anion_label}"
+    ax.set_title(plot_title, color='black', weight=title_font_weight, fontsize=20)
+    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=20)
 
     tick_locs = [k for k in range(int(rdf_max))] + [vline]
     ax.set_xticks(tick_locs)
-    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=30)
-    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=5,
+    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=20)
+    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=3,
                label=f"Bond distance {vline} Å")
-    ax.legend(prop={'size': 25, 'weight': font_weight})
+    ax.legend(prop={'size': 15, 'weight': font_weight})
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
     ax.tick_params(width=5, length=5, color='black')
     ax.set_xlim(0, rdf_max)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=30)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=30)
+    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
+    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
     plt.tight_layout()
     plt.savefig("rdf_oxide.svg")
     plt.show()
 
-helix.plot_rdf_type1type2 = plot_rdf_type1type2
+Helix.plot_rdf_cation_anion = plot_rdf_cation_anion
 
-def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4.0,
-                   vline=2.95,
+def plot_rdf_metal(self, type_id=None, cube=50, a_theory=4.078, bins=100, rdf_max=4.0,
+                   vline=None,
                    font_weight='normal', title_font_weight='normal'):
     """
     Plot the metal–metal RDF.
@@ -631,23 +916,30 @@ def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4
     rdf_max       : float – RDF cutoff (Å), default 4.0
     periodic      : bool  – apply z-PBC
     Lims          : list  – system limits (required for PBC)
-    vline         : float – reference bond distance marker (Å)
+    vline         : float or None – reference distance marker (Å); when None,
+                    use the mean nearest metal–metal distance
     font_weight, title_font_weight : str – matplotlib font weight strings
     """
+                       
 
-    print("TO REview")
-
+    _require_material(self, "metal")
     Pos = self.Pos
     Types = self.Types
     Lims = self.Lims
     periodic = self.periodic
 
+    metal_type_ids = _metal_type_ids(self, type_id)
     threshold  = rdf_max
-    Pos_metal  = Pos
+    Pos_metal  = Pos[np.isin(Types, metal_type_ids)]
     N          = len(Pos_metal)
     if N == 0:
-        print(f"No atoms with type_id={type_id} found.")
-        return
+        raise ValueError(f"No atoms found for metal type id(s) {metal_type_ids}.")
+    if vline is None:
+        vline = _mean_nearest_pair_distance(
+            Pos, Types, metal_type_ids, metal_type_ids,
+            periodic=periodic and len(Lims) > 0, Lims=Lims,
+            exclude_same_atoms=True,
+        )
 
     Lx, Ly, Lz = np.max(Pos_metal, axis=0)
     lx, ly, lz = np.min(Pos_metal, axis=0)
@@ -711,9 +1003,9 @@ def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4
                     mask = (Idx_pad != gi) & (D[local_i] > 0)
                     Dist_list.append(D[local_i][mask])
 
-    purple           = np.array([ 96,  25, 255]) / 255
-    dark_purple      = np.array([ 56,  20, 180]) / 255
-    dark_dark_purple = np.array([ 34,  10, 120]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
     Dist_flat        = np.concatenate(Dist_list) if Dist_list else np.array([])
 
     fig, ax = plt.subplots(figsize=(12, 10))
@@ -730,33 +1022,34 @@ def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4
     for rect, val in zip(patches, g_r):
         rect.set_height(val)
 
-    ax.set_title("RDF Metal–Metal", color='black', weight=title_font_weight, fontsize=30)
-    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=30)
-    ax.set_ylabel("g(r)",         color='black', weight=font_weight, fontsize=30)
+    ax.set_title("RDF Metal–Metal", color='black', weight=title_font_weight, fontsize=20)
+    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=20)
+    ax.set_ylabel("g(r)",         color='black', weight=font_weight, fontsize=20)
     tick_locs = [k for k in range(int(rdf_max))] + [vline]
     ax.set_xticks(tick_locs)
-    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=30)
-    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=5,
+    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=20)
+    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=3,
                label=f"Bond distance {vline} Å")
     ax.legend(prop={'size': 25, 'weight': font_weight})
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
     ax.tick_params(width=5, length=10, color='black')
     ax.set_xlim(0, rdf_max)
     ax.set_ylim(0, 2)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=30)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=30)
+    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
+    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
     plt.tight_layout()
     plt.savefig("rdf_metal.svg")
 
 
-helix.plot_rdf_metal = plot_rdf_metal
+Helix.plot_rdf_metal = plot_rdf_metal
+
 
 # ---------------------------------------------------------------------------
-# Metal structure validation
+# Plot coordination check
 # ---------------------------------------------------------------------------
 
-def check_metal_structure(type_id=1,
-                          a_theory=4.078,
+def plot_coordination_metal(self, type_id=None,
+                          a_theory=None,
                           threshold_nn=3.2,
                           cube=30,
                           plot=True,
@@ -778,26 +1071,34 @@ def check_metal_structure(type_id=1,
     plot          : bool   – show matplotlib figures, default True
     font_weight, title_font_weight : str – matplotlib font weight strings
 
-    Returns
-    -------
-    report : dict – nn_dist_mean/std, cn_mean, cn_counts, n_too_close,
-                    n_isolated, strain_mean/std
     """
-
-    print("TO REview")
 
     Pos = self.Pos
     Types = self.Types
+
+    metal_type_ids = _metal_type_ids(self, type_id)
+    if a_theory is None:
+        symbols = {
+            self.type_map[type_id]
+            for type_id in metal_type_ids
+            if type_id in self.type_map
+        }
+        fcc_lattice_parameters = {"Au": 4.078, "Ag": 4.086, "Cu": 3.615}
+        if len(symbols) != 1 or not symbols <= fcc_lattice_parameters.keys():
+            raise ValueError(
+                "a_theory must be provided unless one supported FCC metal is selected."
+            )
+        a_theory = fcc_lattice_parameters[symbols.pop()]
 
     d_NN     = a_theory / np.sqrt(2)
     d_min_ok = 0.85 * d_NN
     pad      = threshold_nn + 0.2
 
-    metal_pos = Pos[Types == type_id]
+    metal_pos = Pos[np.isin(Types, metal_type_ids)]
     N = len(metal_pos)
     if N == 0:
-        raise ValueError(f"No atoms with type_id={type_id} found.")
-    print(f"Checking {N} metal atoms (type {type_id})")
+        raise ValueError(f"No atoms found for metal type id(s) {metal_type_ids}.")
+    print(f"Checking {N} metal atoms (type id(s) {metal_type_ids})")
 
     lx, ly, lz = np.min(metal_pos, axis=0)
     Lx, Ly, Lz = np.max(metal_pos, axis=0)
@@ -857,8 +1158,9 @@ def check_metal_structure(type_id=1,
     if not plot:
         return report
 
-    purple      = np.array([ 96,  25, 255]) / 255
-    dark_purple = np.array([ 56,  20, 180]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
 
     cn_vals  = sorted(report['cn_counts'].keys())
     cn_freqs = [report['cn_counts'][c] for c in cn_vals]
@@ -868,7 +1170,7 @@ def check_metal_structure(type_id=1,
     for spine in ax.spines.values():
         spine.set_linewidth(5)
 
-    bars = ax.bar(cn_vals, cn_freqs, color=purple, edgecolor=dark_purple, linewidth=5)
+    bars = ax.bar(cn_vals, cn_freqs, color=purple, edgecolor=dark_purple, linewidth=3)
 
     top_three = sorted(
         [(val / N * 100, bar, val) for bar, val in zip(bars, cn_freqs)],
@@ -885,20 +1187,203 @@ def check_metal_structure(type_id=1,
 
     ax.set_title("Coordination number distribution", color='black',
                  weight=title_font_weight, fontsize=30)
-    ax.set_xlabel("Coordination number", color='black', weight=font_weight, fontsize=30)
-    ax.set_ylabel("Number of atoms",     color='black', weight=font_weight, fontsize=30)
+    ax.set_xlabel("Coordination number", color='black', weight=font_weight, fontsize=20)
+    ax.set_ylabel("Number of atoms",     color='black', weight=font_weight, fontsize=20)
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
     ax.tick_params(width=5, length=5, color=dark_purple)
     ax.set_xlim(4, 14)
     ax.set_ylim(0, max(cn_freqs) * 1.15)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=30)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=30)
+    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
+    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
     plt.tight_layout()
     plt.savefig("coordination_metal.svg")
+    plt.show()
 
     return report
 
+
+Helix.plot_coordination_metal = plot_coordination_metal
+
+
+
+def plot_coordination_oxide(self, cation=None, anion=None, cutoff=2.5,
+                            include_H_in_anion=True, save="coordination_oxide.svg", show=True,
+                            font_weight="normal", title_font_weight="normal"):
+    """
+    Plot cation and anion coordination-number histograms for an oxide helix.
+
+    The helix's oxide type roles are selected automatically unless ``cation``
+    or ``anion`` is provided.
+
+    Parameters
+    ----------
+    self : Helix
+        Helix object containing positions, atom types, and the material type map.
+    cation : str, int, or sequence of str or int, optional
+        Cation element symbol(s) or type ID(s). Defaults to the cation type IDs
+        inferred from ``self.type_map``.
+    anion : str, int, or sequence of str or int, optional
+        Anion element symbol(s) or type ID(s). Defaults to oxygen type IDs
+        inferred from ``self.type_map``.
+    cutoff : float, default=2.5
+        Maximum cation-anion distance, in angstroms, used to count neighbours.
+    include_H_in_anion : bool, default=True
+        Include hydrogen neighbours in the anion coordination counts.
+        Hydrogen coordination uses a fixed 1.3 angstrom cutoff.
+    save : str or None, default="coordination_oxide.svg"
+        Output path for the figure. Set to ``None`` to skip saving.
+    show : bool, default=True
+        Whether to display the figure.
+    font_weight : str, default="normal"
+        Font weight used for axis labels and tick labels.
+    title_font_weight : str, default="normal"
+        Font weight used for plot titles.
+
+    Returns
+    -------
+    dict
+        ``cn_cat``, ``cn_an``, and ``an_h`` coordination arrays, cation-anion
+        distances in ``dist``, and selected atom indices in ``cat_idx`` and
+        ``an_idx``.
+
+    """
+    _require_material(self, "oxide")
+    cation_types = _resolve_type_ids(
+        self, cation, self.oxide_cation_types, "cation"
+    )
+    anion_types = _resolve_type_ids(
+        self, anion, self.oxide_anion_types, "anion"
+    )
+    hydrogen_types = self.hydrogen_types
+    cation_label = _type_labels(self, cation_types)
+    anion_label = _type_labels(self, anion_types)
+    Pos = np.asarray(self.Pos, dtype=float)
+    Types = np.asarray(self.Types)
+    rdf_max = 5.0
+    cutoff_H = 1.3
+    if self.periodic and self.Lims is not None and len(self.Lims) > 0:
+        Pos_all, source_indices = _periodic_images_z(
+            Pos, self.Lims, max(rdf_max, cutoff_H)
+        )
+    else:
+        Pos_all = Pos
+        source_indices = np.arange(len(Pos))
+    Types_all = Types[source_indices]
+
+    cat_idx = np.where(np.isin(Types, cation_types))[0]
+    an_idx = np.where(np.isin(Types, anion_types))[0]
+    cat_all = np.where(np.isin(Types_all, cation_types))[0]
+    an_all = np.where(np.isin(Types_all, anion_types))[0]
+    hydrogen_all = np.where(np.isin(Types_all, hydrogen_types))[0]
+
+    cat_tree = cKDTree(Pos[cat_idx])
+    anion_tree = cKDTree(Pos[an_idx])
+    cat_all_tree = cKDTree(Pos_all[cat_all])
+    anion_all_tree = cKDTree(Pos_all[an_all])
+
+    cat_neighbours = cat_tree.query_ball_tree(anion_all_tree, rdf_max)
+    cat_distances = []
+    cn_cat = np.zeros(len(cat_idx), dtype=int)
+    for i, neighbour_indices in enumerate(cat_neighbours):
+        if neighbour_indices:
+            distances = np.linalg.norm(
+                Pos_all[an_all[neighbour_indices]] - Pos[cat_idx[i]], axis=1
+            )
+            cat_distances.extend(distances)
+            cn_cat[i] = np.sum(distances < cutoff)
+
+    anion_neighbours = anion_tree.query_ball_tree(cat_all_tree, cutoff)
+    cn_an = np.array([len(neighbours) for neighbours in anion_neighbours], dtype=int)
+
+    if len(hydrogen_all):
+        hydrogen_tree = cKDTree(Pos_all[hydrogen_all])
+        hydrogen_neighbours = anion_tree.query_ball_tree(hydrogen_tree, cutoff_H)
+        an_h = np.array(
+            [len(neighbours) for neighbours in hydrogen_neighbours], dtype=int
+        )
+    else:
+        an_h = np.zeros(len(an_idx), dtype=int)
+
+    res = {
+        "cn_cat": cn_cat,
+        "cn_an": cn_an,
+        "an_h": an_h,
+        "dist": np.asarray(cat_distances),
+        "cat_idx": cat_idx,
+        "an_idx": an_idx,
+    }
+    cn_cat = res["cn_cat"]
+    cn_an = res["cn_an"] + (res["an_h"] if include_H_in_anion else 0)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+
+    cat_cn_vals = np.arange(10)
+    cat_cn_freqs = np.array([np.sum(cn_cat == cn) for cn in cat_cn_vals])
+    for spine in ax1.spines.values():
+        spine.set_linewidth(5)
+    cat_bars = ax1.bar(cat_cn_vals, cat_cn_freqs, color=_PURPLE,
+                       edgecolor=_DARK_PURPLE, linewidth=3)
+    for i in np.argsort(cat_cn_freqs)[::-1][:3]:
+        if cat_cn_freqs[i]:
+            ax1.text(
+                cat_bars[i].get_x() + cat_bars[i].get_width() / 2.0,
+                cat_cn_freqs[i] + cat_cn_freqs.max() * 0.02,
+                f"{100 * cat_cn_freqs[i] / len(cn_cat):.1f}%",
+                ha="center", va="bottom", color=_DARK_PURPLE,
+                weight=font_weight, fontsize=20,
+            )
+    ax1.set_title(f"{cation_label} coordination", color="black",
+                  weight=title_font_weight, fontsize=20)
+    ax1.set_xlabel(f"Number of {anion_label} neighbours", color="black",
+                   weight=font_weight, fontsize=20)
+    ax1.set_ylabel(f"Number of {cation_label}", color="black",
+                   weight=font_weight, fontsize=20)
+    ax1.set_xticks(cat_cn_vals)
+    ax1.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
+    ax1.tick_params(width=5, length=5, color="black")
+    ax1.set_ylim(0, cat_cn_freqs.max() * 1.15)
+    plt.setp(ax1.get_yticklabels(), color="black", weight=font_weight, fontsize=20)
+    plt.setp(ax1.get_xticklabels(), color="black", weight=font_weight, fontsize=20)
+
+    an_cn_vals = np.arange(7)
+    an_cn_freqs = np.array([np.sum(cn_an == cn) for cn in an_cn_vals])
+    for spine in ax2.spines.values():
+        spine.set_linewidth(5)
+    an_bars = ax2.bar(an_cn_vals, an_cn_freqs, color=_PURPLE,
+                      edgecolor=_DARK_PURPLE, linewidth=3)
+    for i in np.argsort(an_cn_freqs)[::-1][:3]:
+        if an_cn_freqs[i]:
+            ax2.text(
+                an_bars[i].get_x() + an_bars[i].get_width() / 2.0,
+                an_cn_freqs[i] + an_cn_freqs.max() * 0.02,
+                f"{100 * an_cn_freqs[i] / len(cn_an):.1f}%",
+                ha="center", va="bottom", color=_DARK_PURPLE,
+                weight=font_weight, fontsize=20,
+            )
+    anion_x_label = f"Number of {cation_label}" + (
+        " + H" if include_H_in_anion else ""
+    ) + " neighbours"
+    ax2.set_title(f"{anion_label} coordination", color="black",
+                  weight=title_font_weight, fontsize=20)
+    ax2.set_xlabel(anion_x_label, color="black", weight=font_weight, fontsize=20)
+    ax2.set_ylabel(f"Number of {anion_label}", color="black",
+                   weight=font_weight, fontsize=20)
+    ax2.set_xticks(an_cn_vals)
+    ax2.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
+    ax2.tick_params(width=5, length=5, color="black")
+    ax2.set_ylim(0, an_cn_freqs.max() * 1.15)
+    plt.setp(ax2.get_yticklabels(), color="black", weight=font_weight, fontsize=20)
+    plt.setp(ax2.get_xticklabels(), color="black", weight=font_weight, fontsize=20)
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(save)
+    if show:
+        plt.show()
+    return res
+
+Helix.plot_coordination_oxide = plot_coordination_oxide
 
 # ---------------------------------------------------------------------------
 # Oxide analysis helpers (compute + plot)
@@ -954,7 +1439,7 @@ def plot_compute_analysis(self, hist_Dens, hist_Si, hist_O,
     print(Counts)
     return [hist_Dens, hist_Si, hist_O], Counts
 
-helix.plot_compute_analysis = plot_compute_analysis
+Helix.plot_compute_analysis = plot_compute_analysis
 
 def plot_analysis(Counts_Hists, Counts, hist_Dens, hist_Si, hist_O):
     """Update histogram bar heights (used by analyze_mult)."""
@@ -996,8 +1481,9 @@ def analyze_mult(list_Tstep, list_Pos, list_Types,
     anion_type    : int   – type id of the anion,  default 2
     """
 
-    purple      = np.array([ 96,  25, 255]) / 255
-    dark_purple = np.array([ 56,  20, 180]) / 255
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
 
     fig, ax = plt.subplots()
     if save:
@@ -1126,7 +1612,9 @@ def save_defects(self, file_name="defects.txt",
 
     write_xyz(file_name, Pos, Types)
 
-helix.save_defects = save_defects
+Helix.save_defects = save_defects
+
+
 # ---------------------------------------------------------------------------
 # Surface (QuickSurf) and curvature analysis
 # ---------------------------------------------------------------------------
@@ -1291,7 +1779,7 @@ def plot_analyze_defects(self, Cycles=None, L_cycles=None,
         plotter.add_mesh(smooth, opacity=0.1, color="red", name="contour")
         plotter.show()
 
-helix.plot_analyze_defects = plot_analyze_defects
+Helix.plot_analyze_defects = plot_analyze_defects
 
 def plot_analyze_density(self, d_spacing=5, isovalue=2., alpha=2., prec=20,
                     d=10, length_box=20, smoothing=1000, N_th=8):
@@ -1342,7 +1830,7 @@ def plot_analyze_density(self, d_spacing=5, isovalue=2., alpha=2., prec=20,
                                       "label_font_size": 40})
     plotter.show()
 
-helix.plot_analyze_density = plot_analyze_density
+Helix.plot_analyze_density = plot_analyze_density
 
 
 # ---------------------------------------------------------------------------
@@ -1445,7 +1933,7 @@ def analyze_plot_syst(self,
                               title="Pos", fmt="%3.3e")
     plotter.show()
 
-helix.analyze_plot_syst = analyze_plot_syst
+Helix.analyze_plot_syst = analyze_plot_syst
 
 # ---------------------------------------------------------------------------
 # Visualisation – atom rendering
@@ -1595,145 +2083,6 @@ def plot_structure(self, point_size=12, type_colors=None,
         plotter.enable_parallel_projection()
     plotter.show()
 
-helix.plot_structure = plot_structure
-
-def visualize_structure_cast_surface_separation(self, point_size=12,
-                                                type_colors=None, sphere=True,
-                                                parallel_proj=True,
-                                                cast_mask=None, cast=False):
-    """Visualize surface and cast atoms separately in a 3D PyVista plot.
-
-    Parameters
-    ----------
-    Pos : ndarray
-        Atom positions.
-    Types : ndarray
-        Atom type ids.
-    Lims : array-like, optional
-        Simulation box limits.
-    point_size : int, optional
-        Point size for rendered atoms.
-    type_colors : dict, optional
-        Mapping of atom types to RGB color lists.
-    sphere : bool, optional
-        Whether to render atoms as spheres.
-    parallel_proj : bool, optional
-        Enable parallel projection in the PyVista scene.
-    cast_mask : ndarray, optional
-        Boolean mask selecting cast atoms.
-    cast : bool, optional
-        If True and no mask is provided, treat all atoms as cast atoms.
-
-    Returns
-    -------
-    None
-    """
-
-    print("TO FINISH with the radius and colors")
-
-    Pos = self.Pos
-    Types = self.Types
-    Lims = self.Lims
+Helix.plot_structure = plot_structure
 
 
-    radii = {1: 0.5, 2: 0.4, 3: 0.8, 4: 0.8}
-    plotter = pv.Plotter()
-
-    if cast_mask is not None:
-        split_colors = {"surface": [103, 179, 179], "cast": [192, 0, 0]}
-        for flag, key in [(cast_mask, "cast"), (~cast_mask, "surface")]:
-            if np.any(flag):
-                geom = pv.Sphere(radius=0.5)
-                mesh = (pv.PolyData(Pos[flag].astype(float)).glyph(scale=False, geom=geom)
-                        if sphere else pv.PolyData(Pos[flag].astype(float)))
-                plotter.add_mesh(mesh, color=split_colors[key], lighting=False)
-    else:
-        if type_colors is None:
-            color = [192, 0, 0] if cast else [103, 179, 179]
-            type_colors = {1: color, 2: color, 3: color, 4: color}
-        # ← no plotter = pv.Plotter() here
-        for t, color in type_colors.items():
-            mask = Types == t
-            if not np.any(mask):
-                continue
-            if sphere:
-                geom = pv.Sphere(radius=radii.get(t, 0.5))
-                mesh = pv.PolyData(Pos[mask].astype(float)).glyph(scale=False, geom=geom)
-            else:
-                mesh = pv.PolyData(Pos[mask].astype(float))
-            plotter.add_mesh(mesh, color=color, lighting=False)
-
-    if Lims is not None:
-        plotter.add_mesh(
-            pv.Box(bounds=(Lims[0][0], Lims[0][1],
-                           Lims[1][0], Lims[1][1],
-                           Lims[2][0], Lims[2][1])),
-            style="wireframe",
-        )
-
-    if parallel_proj:
-        plotter.enable_parallel_projection()
-    plotter.show()
-
-
-helix.visualize_structure_cast_surface_separation = visualize_structure_cast_surface_separation
-
-
-def visualize_close_contacts(self, threshold=1.0,
-                              point_size=8, type_colors=None, type=1):
-    """
-    Highlight same-type atom pairs closer than *threshold* Å.
-    """
-
-    print("TO FINISH with colors and radius etc...")
-
-    Pos = self.Pos
-    Types = self.Types
-    Lims = self.Lims
-
-
-    if type_colors is None:
-        type_colors = {1: "gold", 2: "red", 3: "blue"}
-
-    plotter = pv.Plotter()
-    for t, color in type_colors.items():
-        mask = Types == t
-        if np.any(mask):
-            plotter.add_mesh(pv.PolyData(Pos[mask].astype(float)), color=color)
-
-    Pos_type = Pos[Types == type].astype(float)
-    if len(Pos_type) > 1:
-        tree  = KDTree(Pos_type)
-        pairs = np.array(list(tree.query_pairs(r=threshold)), dtype=int)
-        if len(pairs):
-            close_idx = np.unique(pairs.ravel())
-            plotter.add_mesh(pv.PolyData(Pos_type[close_idx]), color="cyan")
-
-            n     = len(pairs)
-            pts   = np.vstack([Pos_type[pairs[:, 0]], Pos_type[pairs[:, 1]]])
-            cells = np.empty((n, 3), dtype=int)
-            cells[:, 0] = 2
-            cells[:, 1] = np.arange(n)
-            cells[:, 2] = np.arange(n) + n
-            lm        = pv.PolyData()
-            lm.points = pts
-            lm.lines  = cells.ravel()
-            plotter.add_mesh(lm, color="cyan", line_width=1)
-
-            print(f"[close contacts] {n} type-{type}–type-{type} pair(s) with d < {threshold} Å")
-            for i, j in pairs:
-                d = np.linalg.norm(Pos_type[i] - Pos_type[j])
-                print(f"  atom {i} and {j}: {d:.4f} Å")
-        else:
-            print(f"[close contacts] No type-{type}–type-{type} pair closer than {threshold} Å")
-
-    if Lims is not None:
-        plotter.add_mesh(
-            pv.Box(bounds=(Lims[0][0], Lims[0][1],
-                           Lims[1][0], Lims[1][1],
-                           Lims[2][0], Lims[2][1])),
-            style="wireframe",
-        )
-    plotter.show()
-
-helix.visualize_close_contacts = visualize_close_contacts

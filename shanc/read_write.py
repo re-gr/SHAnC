@@ -985,7 +985,8 @@ def read_structure_from_file(file, do_scale=True, atom_style="full"):
     return Atom_pos, Atom_types, Lims, mass_map, type_map
 
 
-def create_helix_from_file(file, do_scale=True, atom_style="full"):
+
+def create_helix_from_file(file, do_scale=True,  atom_style="atom"):
     """
     read_structure_from_data(file, do_scale=True, atom_style="full")
 
@@ -996,7 +997,8 @@ def create_helix_from_file(file, do_scale=True, atom_style="full"):
 
     """
 
-    helix_created = helix
-    helix_created.read_structure(file,do_scale=do_scale,atom_style=atom_style)
+    helix_created = helix()
+    Atom_pos, Atom_types, Lims, mass_map, type_map = helix_created.read_structure(file,do_scale=do_scale,atom_style=atom_style)
 
-    return
+    helix_created.set_atoms(self,Atom_pos,Atom_types,Lims,[],[],type_map,mass_map)
+    return helix_created
