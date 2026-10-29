@@ -128,7 +128,7 @@ class helix:
             except:
                 print("Tried reading the lattice file but an unknown issue happened.")
 
-    
+
     @property
     def metal(self):
         """LAMMPS type ids mapped to metallic elements."""
@@ -144,7 +144,7 @@ class helix:
             type_id for type_id, symbol in self.type_map.items()
             if isinstance(symbol, str) and symbol.capitalize() == "O"
         )
-    
+
     @property
     def hydrogen_types(self):
         """Type ids mapped to hydrogen."""
@@ -359,3 +359,28 @@ class helix:
         self.Lims_lattice = Lims
         self.type_map = type_map
         self.mass_map = mass_map
+
+    def read_structure(self,file):
+        """
+        read_structure(file)
+
+        Reads a data file for the helix
+
+        Parameters
+        ----------
+            file : str
+                The name of the file
+
+        Returns
+        -------
+            None
+                The file is read and the attributes Pos, Types and Lims are set
+        """
+        Atom_pos, Atom_types, Lims, mass_map, type_map = read_structure_from_file(file, do_scale=True, atom_style="atom")
+        self.Pos = Atom_pos
+        self.Types = Atom_types
+        self.Lims = Lims
+        if type_map != {}:
+            self.type_map = type_map
+        if mass_map != {}:
+            self.mass_map = mass_map

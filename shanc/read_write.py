@@ -973,12 +973,12 @@ def read_structure_from_file(file, do_scale=True, atom_style="full"):
         mass_map = _symbol_to_mass_map(type_map)
 
     else:
-        list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file, unscale=False)
+        list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file, unscale=do_scale)
         Lims = list_BOX[-1]
         Atoms_last_step = list_ATOMS[-1]
         Atom_types = Atoms_last_step[:,1]
         Atom_pos = Atoms_last_step[:,2:]
-        print("System extracted from a dump file, no symbol mapping are done. If one wants it to be done, one should use....")
+        print("System extracted from a dump file, no symbol mapping are done. If one wants it to be done, one should load a data file or set it manually.")
         mass_map = {}
         type_map = {}
 
@@ -996,5 +996,7 @@ def create_helix_from_file(file, do_scale=True, atom_style="full"):
 
     """
 
+    helix_created = helix
+    helix_created.read_structure(file,do_scale=do_scale,atom_style=atom_style)
 
     return

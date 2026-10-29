@@ -1488,7 +1488,7 @@ def validate_unit_cell(Atom_pos, Atom_types, Lims,
 
 def plot_structure(self, point_size=12, type_colors=None,
                         sphere=True, parallel_proj=True,
-                        draw_bonds=False, max_bond_dist=2.0):
+                        draw_bonds=True, max_bond_dist=2.0,do_fancy=True):
     """Render the atomic structure in 3D using PyVista.
 
     Parameters
@@ -1516,11 +1516,14 @@ def plot_structure(self, point_size=12, type_colors=None,
     Types = self.Types
     Lims = self.Lims
 
+    ##TO ADD CAST PLOTTING
+
     type_colors = {}
     type_radius = {}
 
 
     type_map = self.type_map
+
     if type_map != {}:
         for type in type_map:
             symbol = type_map[type]
@@ -1547,7 +1550,9 @@ def plot_structure(self, point_size=12, type_colors=None,
             mesh = pv.PolyData(Pos[mask].astype(float)).glyph(scale=False, geom=geom, orient=False)
         else:
             mesh = pv.PolyData(Pos[mask].astype(float))
-        plotter.add_mesh(mesh, color=color, lighting=False)
+
+        if do_fancy: plotter.add_mesh(mesh, color=color, pbr=True,roughness=.5,metallic=.2)
+        else: plotter.add_mesh(mesh, color=color, lighting=False)
 
     if draw_bonds:
 
@@ -1574,7 +1579,8 @@ def plot_structure(self, point_size=12, type_colors=None,
         lines = np.hstack([[2, i_si, i_o] for i_si, i_o in Indices])
         mesh.lines = lines
 
-        plotter.add_mesh(mesh,line_width=10,color="gray")
+        if do_fancy: plotter.add_mesh(mesh, color="gray", pbr=True,roughness=.5,metallic=.2,line_width=5)
+        else: plotter.add_mesh(mesh, color="gray", lighting=False,line_width=5)
 
 
     if Lims is not None:
