@@ -986,7 +986,8 @@ def read_structure_from_file(file, do_scale=True, atom_style="full"):
 
 
 
-def create_helix_from_file(file, do_scale=True, atom_style="full"):
+def create_helix_from_file(file_helix, frame=-1, data_file=None, type_map=None,
+               atom_style="atom"):
     """
     read_structure_from_data(file, do_scale=True, atom_style="full")
 
