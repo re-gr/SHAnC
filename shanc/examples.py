@@ -14,3 +14,12 @@ beta_quartz = (impresources.files(SiO2_files) / "beta_quartz.data").__str__()
 
 Au = (impresources.files(Au_files) / "Au.data").__str__()
 gold = (impresources.files(Au_files) / "Au.data").__str__()
+
+
+SiO2_last_timestep = (impresources.files(SiO2_files) / "last_timestep.lammpstrj").__str__()
+SiO2_last_t = (impresources.files(SiO2_files) / "last_timestep.lammpstrj").__str__()
+SiO2_lt = (impresources.files(SiO2_files) / "last_timestep.lammpstrj").__str__()
+
+Au_last_timestep = (impresources.files(Au_files) / "last_timestep.lammpstrj").__str__()
+Au_last_t = (impresources.files(Au_files) / "last_timestep.lammpstrj").__str__()
+Au_lt = (impresources.files(Au_files) / "last_timestep.lammpstrj").__str__()
