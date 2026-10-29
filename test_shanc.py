@@ -35,7 +35,7 @@ def test_construction_helix():
     helix.create_helix()
     print(helix.material)
     print("Lims",helix.Lims)
-    helix.plot_structure_quick()
+    #helix.plot_structure_quick()
     assert 1
 
 test_construction_helix()
