@@ -1085,4 +1085,4 @@ def create_helix_from_file(file_helix, frame=-1, data_file=None, type_map=None,
     result.timestep = timestep
     result.periodic = bool(len(limits) == 3)
 
-    return
+    return result
