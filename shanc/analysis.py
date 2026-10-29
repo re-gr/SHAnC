@@ -257,11 +257,7 @@ def compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold
     return Bonds_tot_or
 
 
-# ---------------------------------------------------------------------------
 # Neighbour histogram (scalable, periodic-aware)
-# ---------------------------------------------------------------------------
-
-
 def compute_bonds_system(Pos, Types,
                            cube=30,
                            threshold_type1=2, threshold_type2=2, threshold_H=1.3,
@@ -527,13 +523,190 @@ def compute_hist_neighbors(Pos, Types,
     return Dist_list, Cat_count_An_tot[:Num_Cat], An_count_Cat_tot[:Num_An]
 
 
+
+# ---------------------------------------------------------------------------
+# Helpers Atom type resolve 
+# ---------------------------------------------------------------------------
+
+def _require_material(self, expected):
+    if self.material != expected:
+        raise ValueError(
+            f"{expected.capitalize()} analysis requires a {expected} type_map; "
+            f"this helix is {self.material!r}."
+        )
+
+
+def _resolve_type_ids(self, selector, defaults, role):
+    """Resolve a role selection from symbols or validate explicit type IDs."""
+    if selector is None:
+        return tuple(int(type_id) for type_id in defaults)
+
+    if isinstance(selector, str):
+        requested = selector.casefold()
+        selected = tuple(
+            int(type_id) for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str) and symbol.casefold() == requested
+        )
+    else:
+        selected = tuple(int(type_id) for type_id in np.atleast_1d(selector))
+        missing = [type_id for type_id in selected if type_id not in self.type_map]
+        if missing:
+            raise ValueError(f"{role} type ID(s) {missing} are not in helix.type_map.")
+
+    if not selected:
+        raise ValueError(f"Could not resolve {role} selection {selector!r} from helix.type_map.")
+    return selected
+
+
+def _oxide_analysis_types(self, cation_type=None, anion_type=None, hydrogen_type=None):
+    """Resolve oxide role IDs from the helix type map."""
+    _require_material(self, "oxide")
+    cations = _resolve_type_ids(
+        self, cation_type, self.oxide_cation_types, "cation"
+    )
+    anions = _resolve_type_ids(
+        self, anion_type, self.oxide_anion_types, "anion"
+    )
+    hydrogens = _resolve_type_ids(
+        self, hydrogen_type, self.hydrogen_types, "hydrogen"
+    ) if hydrogen_type is not None or self.hydrogen_types else ()
+    if not cations or not anions:
+        raise ValueError(
+            "Oxide analysis requires at least one cation type and one anion type "
+            "in helix.type_map."
+        )
+    return cations, anions, hydrogens
+
+
+def _metal_type_ids(self, type_id=None):
+    """Resolve the metallic types to analyse, validating an optional selection."""
+    if self.material != "metal":
+        raise ValueError(
+            f"Metal analysis requires a metal type_map; this helix is {self.material!r}."
+        )
+    metal_types = tuple(int(type_id) for type_id in self.metal)
+    if type_id is not None:
+        if isinstance(type_id, str) and not type_id.isdecimal():
+            selected = tuple(
+                int(mapped_id) for mapped_id, symbol in self.type_map.items()
+                if isinstance(symbol, str) and symbol.casefold() == type_id.casefold()
+            )
+            if not selected or any(mapped_id not in metal_types for mapped_id in selected):
+                raise ValueError(f"type_id={type_id!r} is not mapped to a metal element.")
+            return selected
+        selected_id = int(type_id)
+        if selected_id not in metal_types:
+            raise ValueError(f"type_id={type_id} is not mapped to a metal element.")
+        return (selected_id,)
+    return metal_types
+
+def _type_labels(self, type_ids):
+    """Return readable element labels for selected type IDs."""
+    return ", ".join(
+        str(self.type_map.get(type_id, f"type {type_id}"))
+        for type_id in type_ids
+    )
+
+def _resolve_type_ids(self, selector, defaults, role):
+    """
+    Resolve a type selector into validated type IDs.
+
+    Parameters
+    ----------
+    self : Helix
+        Helix object containing the type map.
+    selector : str, int, sequence, or None
+        Element symbol or type ID selection. ``None`` uses ``defaults``.
+    defaults : sequence of int
+        Type IDs to use when no selector is specified.
+    role : str
+        Role name used in validation errors.
+
+    Returns
+    -------
+    tuple of int
+        Resolved type IDs.
+
+    Raises
+    ------
+    ValueError
+        If the selection cannot be resolved from the helix type map.
+    """
+    if selector is None:
+        return tuple(int(type_id) for type_id in defaults)
+
+    if isinstance(selector, str):
+        requested = selector.casefold()
+        selected = tuple(
+            int(type_id) for type_id, symbol in self.type_map.items()
+            if isinstance(symbol, str) and symbol.casefold() == requested
+        )
+    else:
+        selected = tuple(int(type_id) for type_id in np.atleast_1d(selector))
+        missing = [type_id for type_id in selected if type_id not in self.type_map]
+        if missing:
+            raise ValueError(f"{role} type ID(s) {missing} are not in helix.type_map.")
+
+    if not selected:
+        raise ValueError(f"Could not resolve {role} selection {selector!r} from helix.type_map.")
+    return selected
+
+def _periodic_images_z(Pos, Lims, margin):
+    """
+    Create z-periodic images of atoms near the box boundaries.
+
+    Parameters
+    ----------
+    Pos : array_like, shape (N, 3)
+        Cartesian atom coordinates.
+    Lims : array_like
+        Box limits in ``[[xlo, xhi], [ylo, yhi], [zlo, zhi]]`` form.
+    margin : float
+        Boundary distance within which atoms are copied.
+
+    Returns
+    -------
+    tuple
+        Coordinates including images and source atom indices. Original atoms
+        precede the images.
+    """
+    lz, Lz = Lims[2]
+    Dz = Lz - lz
+    top = np.where(Pos[:, 2] > Lz - margin)[0]
+    bot = np.where(Pos[:, 2] < lz + margin)[0]
+    Pos_all = np.vstack([Pos, Pos[top] - [0, 0, Dz], Pos[bot] + [0, 0, Dz]])
+    return Pos_all, np.concatenate([np.arange(len(Pos)), top, bot])
+
 # ---------------------------------------------------------------------------
 # RDF plots
 # ---------------------------------------------------------------------------
 def _mean_nearest_pair_distance(Pos, Types, source_types, target_types,
                                 periodic=False, Lims=None,
                                 exclude_same_atoms=False):
-    """Return the mean nearest-target distance for each selected source atom."""
+    """Return the mean nearest-target distance for each selected source atom.
+    
+    Pos : array_like, shape (N, 3)
+        Cartesian atom coordinates.
+    Types : array_like, shape (N,)
+        Atom type IDs.
+    source_types : int or sequence of int
+        Type IDs whose nearest-target distances are averaged.
+    target_types : int or sequence of int
+        Type IDs that provide candidate neighbours.
+    periodic : bool, default=False
+        Apply periodic images along z when box limits are available.
+    Lims : array_like, optional
+        Box limits in ``[[xlo, xhi], [ylo, yhi], [zlo, zhi]]`` form.
+    exclude_same_atoms : bool, default=False
+        Exclude each source atom itself from target candidates.
+
+    Returns
+    -------
+    float
+        Mean nearest-target distance.
+
+    """
+                                    
     Pos = np.asarray(Pos, dtype=float)
     Types = np.asarray(Types)
     source_indices = np.flatnonzero(np.isin(Types, source_types))
@@ -599,13 +772,6 @@ def _mean_nearest_pair_distance(Pos, Types, source_types, target_types,
     if not np.all(np.isfinite(nearest_distances)):
         raise ValueError("Could not determine finite nearest-neighbour distances.")
     return round(float(np.mean(nearest_distances)), 2)
-
-def _type_labels(self, type_ids):
-    """Return readable element labels for selected type IDs."""
-    return ", ".join(
-        str(self.type_map.get(type_id, f"type {type_id}"))
-        for type_id in type_ids
-    )
 
 
 def plot_rdf_cation_anion(self,threshold_type1=2, threshold_type2=2,
@@ -728,7 +894,9 @@ def plot_rdf_metal(self, type_id=None, cube=50, a_theory=4.078, bins=100, rdf_ma
                     use the mean nearest metal–metal distance
     font_weight, title_font_weight : str – matplotlib font weight strings
     """
+                       
 
+    _require_material(self, "metal")
     Pos = self.Pos
     Types = self.Types
     Lims = self.Lims
@@ -849,6 +1017,7 @@ def plot_rdf_metal(self, type_id=None, cube=50, a_theory=4.078, bins=100, rdf_ma
 
 Helix.plot_rdf_metal = plot_rdf_metal
 
+
 # ---------------------------------------------------------------------------
 # Plot coordination check
 # ---------------------------------------------------------------------------
@@ -876,10 +1045,6 @@ def plot_coordination_metal(self, type_id=None,
     plot          : bool   – show matplotlib figures, default True
     font_weight, title_font_weight : str – matplotlib font weight strings
 
-    Returns
-    -------
-    report : dict – nn_dist_mean/std, cn_mean, cn_counts, n_too_close,
-                    n_isolated, strain_mean/std
     """
 
     Pos = self.Pos
@@ -1012,6 +1177,186 @@ def plot_coordination_metal(self, type_id=None,
 
 
 Helix.plot_coordination_metal = plot_coordination_metal
+
+
+
+def plot_coordination_oxide(self, cation=None, anion=None, cutoff=2.5,
+                            include_H_in_anion=True, save="coordination_oxide.svg", show=True,
+                            font_weight="normal", title_font_weight="normal"):
+    """
+    Plot cation and anion coordination-number histograms for an oxide helix.
+
+    The helix's oxide type roles are selected automatically unless ``cation``
+    or ``anion`` is provided.
+
+    Parameters
+    ----------
+    self : Helix
+        Helix object containing positions, atom types, and the material type map.
+    cation : str, int, or sequence of str or int, optional
+        Cation element symbol(s) or type ID(s). Defaults to the cation type IDs
+        inferred from ``self.type_map``.
+    anion : str, int, or sequence of str or int, optional
+        Anion element symbol(s) or type ID(s). Defaults to oxygen type IDs
+        inferred from ``self.type_map``.
+    cutoff : float, default=2.5
+        Maximum cation-anion distance, in angstroms, used to count neighbours.
+    include_H_in_anion : bool, default=True
+        Include hydrogen neighbours in the anion coordination counts.
+        Hydrogen coordination uses a fixed 1.3 angstrom cutoff.
+    save : str or None, default="coordination_oxide.svg"
+        Output path for the figure. Set to ``None`` to skip saving.
+    show : bool, default=True
+        Whether to display the figure.
+    font_weight : str, default="normal"
+        Font weight used for axis labels and tick labels.
+    title_font_weight : str, default="normal"
+        Font weight used for plot titles.
+
+    Returns
+    -------
+    dict
+        ``cn_cat``, ``cn_an``, and ``an_h`` coordination arrays, cation-anion
+        distances in ``dist``, and selected atom indices in ``cat_idx`` and
+        ``an_idx``.
+
+    """
+    _require_material(self, "oxide")
+    cation_types = _resolve_type_ids(
+        self, cation, self.oxide_cation_types, "cation"
+    )
+    anion_types = _resolve_type_ids(
+        self, anion, self.oxide_anion_types, "anion"
+    )
+    hydrogen_types = self.hydrogen_types
+    cation_label = _type_labels(self, cation_types)
+    anion_label = _type_labels(self, anion_types)
+    Pos = np.asarray(self.Pos, dtype=float)
+    Types = np.asarray(self.Types)
+    rdf_max = 5.0
+    cutoff_H = 1.3
+    if self.periodic and self.Lims is not None and len(self.Lims) > 0:
+        Pos_all, source_indices = _periodic_images_z(
+            Pos, self.Lims, max(rdf_max, cutoff_H)
+        )
+    else:
+        Pos_all = Pos
+        source_indices = np.arange(len(Pos))
+    Types_all = Types[source_indices]
+
+    cat_idx = np.where(np.isin(Types, cation_types))[0]
+    an_idx = np.where(np.isin(Types, anion_types))[0]
+    cat_all = np.where(np.isin(Types_all, cation_types))[0]
+    an_all = np.where(np.isin(Types_all, anion_types))[0]
+    hydrogen_all = np.where(np.isin(Types_all, hydrogen_types))[0]
+
+    cat_tree = cKDTree(Pos[cat_idx])
+    anion_tree = cKDTree(Pos[an_idx])
+    cat_all_tree = cKDTree(Pos_all[cat_all])
+    anion_all_tree = cKDTree(Pos_all[an_all])
+
+    cat_neighbours = cat_tree.query_ball_tree(anion_all_tree, rdf_max)
+    cat_distances = []
+    cn_cat = np.zeros(len(cat_idx), dtype=int)
+    for i, neighbour_indices in enumerate(cat_neighbours):
+        if neighbour_indices:
+            distances = np.linalg.norm(
+                Pos_all[an_all[neighbour_indices]] - Pos[cat_idx[i]], axis=1
+            )
+            cat_distances.extend(distances)
+            cn_cat[i] = np.sum(distances < cutoff)
+
+    anion_neighbours = anion_tree.query_ball_tree(cat_all_tree, cutoff)
+    cn_an = np.array([len(neighbours) for neighbours in anion_neighbours], dtype=int)
+
+    if len(hydrogen_all):
+        hydrogen_tree = cKDTree(Pos_all[hydrogen_all])
+        hydrogen_neighbours = anion_tree.query_ball_tree(hydrogen_tree, cutoff_H)
+        an_h = np.array(
+            [len(neighbours) for neighbours in hydrogen_neighbours], dtype=int
+        )
+    else:
+        an_h = np.zeros(len(an_idx), dtype=int)
+
+    res = {
+        "cn_cat": cn_cat,
+        "cn_an": cn_an,
+        "an_h": an_h,
+        "dist": np.asarray(cat_distances),
+        "cat_idx": cat_idx,
+        "an_idx": an_idx,
+    }
+    cn_cat = res["cn_cat"]
+    cn_an = res["cn_an"] + (res["an_h"] if include_H_in_anion else 0)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+
+    cat_cn_vals = np.arange(10)
+    cat_cn_freqs = np.array([np.sum(cn_cat == cn) for cn in cat_cn_vals])
+    for spine in ax1.spines.values():
+        spine.set_linewidth(5)
+    cat_bars = ax1.bar(cat_cn_vals, cat_cn_freqs, color=_PURPLE,
+                       edgecolor=_DARK_PURPLE, linewidth=3)
+    for i in np.argsort(cat_cn_freqs)[::-1][:3]:
+        if cat_cn_freqs[i]:
+            ax1.text(
+                cat_bars[i].get_x() + cat_bars[i].get_width() / 2.0,
+                cat_cn_freqs[i] + cat_cn_freqs.max() * 0.02,
+                f"{100 * cat_cn_freqs[i] / len(cn_cat):.1f}%",
+                ha="center", va="bottom", color=_DARK_PURPLE,
+                weight=font_weight, fontsize=20,
+            )
+    ax1.set_title(f"{cation_label} coordination", color="black",
+                  weight=title_font_weight, fontsize=20)
+    ax1.set_xlabel(f"Number of {anion_label} neighbours", color="black",
+                   weight=font_weight, fontsize=20)
+    ax1.set_ylabel(f"Number of {cation_label}", color="black",
+                   weight=font_weight, fontsize=20)
+    ax1.set_xticks(cat_cn_vals)
+    ax1.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
+    ax1.tick_params(width=5, length=5, color="black")
+    ax1.set_ylim(0, cat_cn_freqs.max() * 1.15)
+    plt.setp(ax1.get_yticklabels(), color="black", weight=font_weight, fontsize=20)
+    plt.setp(ax1.get_xticklabels(), color="black", weight=font_weight, fontsize=20)
+
+    an_cn_vals = np.arange(7)
+    an_cn_freqs = np.array([np.sum(cn_an == cn) for cn in an_cn_vals])
+    for spine in ax2.spines.values():
+        spine.set_linewidth(5)
+    an_bars = ax2.bar(an_cn_vals, an_cn_freqs, color=_PURPLE,
+                      edgecolor=_DARK_PURPLE, linewidth=3)
+    for i in np.argsort(an_cn_freqs)[::-1][:3]:
+        if an_cn_freqs[i]:
+            ax2.text(
+                an_bars[i].get_x() + an_bars[i].get_width() / 2.0,
+                an_cn_freqs[i] + an_cn_freqs.max() * 0.02,
+                f"{100 * an_cn_freqs[i] / len(cn_an):.1f}%",
+                ha="center", va="bottom", color=_DARK_PURPLE,
+                weight=font_weight, fontsize=20,
+            )
+    anion_x_label = f"Number of {cation_label}" + (
+        " + H" if include_H_in_anion else ""
+    ) + " neighbours"
+    ax2.set_title(f"{anion_label} coordination", color="black",
+                  weight=title_font_weight, fontsize=20)
+    ax2.set_xlabel(anion_x_label, color="black", weight=font_weight, fontsize=20)
+    ax2.set_ylabel(f"Number of {anion_label}", color="black",
+                   weight=font_weight, fontsize=20)
+    ax2.set_xticks(an_cn_vals)
+    ax2.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
+    ax2.tick_params(width=5, length=5, color="black")
+    ax2.set_ylim(0, an_cn_freqs.max() * 1.15)
+    plt.setp(ax2.get_yticklabels(), color="black", weight=font_weight, fontsize=20)
+    plt.setp(ax2.get_xticklabels(), color="black", weight=font_weight, fontsize=20)
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(save)
+    if show:
+        plt.show()
+    return res
+
+Helix.plot_coordination_oxide = plot_coordination_oxide
 
 
 # ---------------------------------------------------------------------------
@@ -1240,7 +1585,9 @@ def save_defects(self, file_name="defects.txt",
 
     write_xyz(file_name, Pos, Types)
 
-helix.save_defects = save_defects
+Helix.save_defects = save_defects
+
+
 # ---------------------------------------------------------------------------
 # Surface (QuickSurf) and curvature analysis
 # ---------------------------------------------------------------------------
@@ -1456,7 +1803,7 @@ def plot_analyze_density(self, d_spacing=5, isovalue=2., alpha=2., prec=20,
                                       "label_font_size": 40})
     plotter.show()
 
-helix.plot_analyze_density = plot_analyze_density
+Helix.plot_analyze_density = plot_analyze_density
 
 
 # ---------------------------------------------------------------------------
@@ -1559,7 +1906,7 @@ def analyze_plot_syst(self,
                               title="Pos", fmt="%3.3e")
     plotter.show()
 
-helix.analyze_plot_syst = analyze_plot_syst
+Helix.analyze_plot_syst = analyze_plot_syst
 
 # ---------------------------------------------------------------------------
 # Visualisation – atom rendering
@@ -1703,145 +2050,6 @@ def plot_structure(self, point_size=12, type_colors=None,
         plotter.enable_parallel_projection()
     plotter.show()
 
-helix.plot_structure = plot_structure
-
-def visualize_structure_cast_surface_separation(self, point_size=12,
-                                                type_colors=None, sphere=True,
-                                                parallel_proj=True,
-                                                cast_mask=None, cast=False):
-    """Visualize surface and cast atoms separately in a 3D PyVista plot.
-
-    Parameters
-    ----------
-    Pos : ndarray
-        Atom positions.
-    Types : ndarray
-        Atom type ids.
-    Lims : array-like, optional
-        Simulation box limits.
-    point_size : int, optional
-        Point size for rendered atoms.
-    type_colors : dict, optional
-        Mapping of atom types to RGB color lists.
-    sphere : bool, optional
-        Whether to render atoms as spheres.
-    parallel_proj : bool, optional
-        Enable parallel projection in the PyVista scene.
-    cast_mask : ndarray, optional
-        Boolean mask selecting cast atoms.
-    cast : bool, optional
-        If True and no mask is provided, treat all atoms as cast atoms.
-
-    Returns
-    -------
-    None
-    """
-
-    print("TO FINISH with the radius and colors")
-
-    Pos = self.Pos
-    Types = self.Types
-    Lims = self.Lims
+Helix.plot_structure = plot_structure
 
 
-    radii = {1: 0.5, 2: 0.4, 3: 0.8, 4: 0.8}
-    plotter = pv.Plotter()
-
-    if cast_mask is not None:
-        split_colors = {"surface": [103, 179, 179], "cast": [192, 0, 0]}
-        for flag, key in [(cast_mask, "cast"), (~cast_mask, "surface")]:
-            if np.any(flag):
-                geom = pv.Sphere(radius=0.5)
-                mesh = (pv.PolyData(Pos[flag].astype(float)).glyph(scale=False, geom=geom)
-                        if sphere else pv.PolyData(Pos[flag].astype(float)))
-                plotter.add_mesh(mesh, color=split_colors[key], lighting=False)
-    else:
-        if type_colors is None:
-            color = [192, 0, 0] if cast else [103, 179, 179]
-            type_colors = {1: color, 2: color, 3: color, 4: color}
-        # ← no plotter = pv.Plotter() here
-        for t, color in type_colors.items():
-            mask = Types == t
-            if not np.any(mask):
-                continue
-            if sphere:
-                geom = pv.Sphere(radius=radii.get(t, 0.5))
-                mesh = pv.PolyData(Pos[mask].astype(float)).glyph(scale=False, geom=geom)
-            else:
-                mesh = pv.PolyData(Pos[mask].astype(float))
-            plotter.add_mesh(mesh, color=color, lighting=False)
-
-    if Lims is not None:
-        plotter.add_mesh(
-            pv.Box(bounds=(Lims[0][0], Lims[0][1],
-                           Lims[1][0], Lims[1][1],
-                           Lims[2][0], Lims[2][1])),
-            style="wireframe",
-        )
-
-    if parallel_proj:
-        plotter.enable_parallel_projection()
-    plotter.show()
-
-
-helix.visualize_structure_cast_surface_separation = visualize_structure_cast_surface_separation
-
-
-def visualize_close_contacts(self, threshold=1.0,
-                              point_size=8, type_colors=None, type=1):
-    """
-    Highlight same-type atom pairs closer than *threshold* Å.
-    """
-
-    print("TO FINISH with colors and radius etc...")
-
-    Pos = self.Pos
-    Types = self.Types
-    Lims = self.Lims
-
-
-    if type_colors is None:
-        type_colors = {1: "gold", 2: "red", 3: "blue"}
-
-    plotter = pv.Plotter()
-    for t, color in type_colors.items():
-        mask = Types == t
-        if np.any(mask):
-            plotter.add_mesh(pv.PolyData(Pos[mask].astype(float)), color=color)
-
-    Pos_type = Pos[Types == type].astype(float)
-    if len(Pos_type) > 1:
-        tree  = KDTree(Pos_type)
-        pairs = np.array(list(tree.query_pairs(r=threshold)), dtype=int)
-        if len(pairs):
-            close_idx = np.unique(pairs.ravel())
-            plotter.add_mesh(pv.PolyData(Pos_type[close_idx]), color="cyan")
-
-            n     = len(pairs)
-            pts   = np.vstack([Pos_type[pairs[:, 0]], Pos_type[pairs[:, 1]]])
-            cells = np.empty((n, 3), dtype=int)
-            cells[:, 0] = 2
-            cells[:, 1] = np.arange(n)
-            cells[:, 2] = np.arange(n) + n
-            lm        = pv.PolyData()
-            lm.points = pts
-            lm.lines  = cells.ravel()
-            plotter.add_mesh(lm, color="cyan", line_width=1)
-
-            print(f"[close contacts] {n} type-{type}–type-{type} pair(s) with d < {threshold} Å")
-            for i, j in pairs:
-                d = np.linalg.norm(Pos_type[i] - Pos_type[j])
-                print(f"  atom {i} and {j}: {d:.4f} Å")
-        else:
-            print(f"[close contacts] No type-{type}–type-{type} pair closer than {threshold} Å")
-
-    if Lims is not None:
-        plotter.add_mesh(
-            pv.Box(bounds=(Lims[0][0], Lims[0][1],
-                           Lims[1][0], Lims[1][1],
-                           Lims[2][0], Lims[2][1])),
-            style="wireframe",
-        )
-    plotter.show()
-
-Helix.visualize_close_contacts = visualize_close_contacts
