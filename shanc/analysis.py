@@ -530,11 +530,88 @@ def compute_hist_neighbors(Pos, Types,
 # ---------------------------------------------------------------------------
 # RDF plots
 # ---------------------------------------------------------------------------
+def _mean_nearest_pair_distance(Pos, Types, source_types, target_types,
+                                periodic=False, Lims=None,
+                                exclude_same_atoms=False):
+    """Return the mean nearest-target distance for each selected source atom."""
+    Pos = np.asarray(Pos, dtype=float)
+    Types = np.asarray(Types)
+    source_indices = np.flatnonzero(np.isin(Types, source_types))
+    target_indices = np.flatnonzero(np.isin(Types, target_types))
+    if not len(source_indices):
+        raise ValueError("Cannot determine an automatic vline: no source atoms found.")
+    if not len(target_indices):
+        raise ValueError("Cannot determine an automatic vline: no target atoms found.")
+    if exclude_same_atoms and len(target_indices) < 2:
+        raise ValueError(
+            "Cannot determine a metal nearest-neighbour vline with fewer than "
+            "two selected atoms."
+        )
 
-def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
+    target_positions = Pos[target_indices]
+    target_atom_indices = target_indices
+    if periodic and (Lims is None or len(Lims) == 0):
+        periodic = False
+    if periodic:
+        if len(Lims) < 3:
+            raise ValueError(
+                "Cannot determine an automatic vline with periodic boundaries "
+                "without three box limits."
+            )
+        z_min, z_max = np.asarray(Lims, dtype=float)[2]
+        z_period = z_max - z_min
+        if z_period <= 0:
+            raise ValueError("The periodic z box limit must have positive length.")
+        target_positions = np.vstack((
+            target_positions,
+            target_positions + [0, 0, z_period],
+            target_positions - [0, 0, z_period],
+        ))
+        target_atom_indices = np.tile(target_indices, 3)
+
+    tree = cKDTree(target_positions)
+    source_positions = Pos[source_indices]
+    if not exclude_same_atoms:
+        distances, _ = tree.query(source_positions, k=1)
+        nearest_distances = np.asarray(distances)
+    else:
+        # Query increasingly many candidates until each source has a target
+        # other than itself; periodic images retain their original atom ID.
+        nearest_distances = np.full(len(source_indices), np.inf)
+        k = min(4, len(target_atom_indices))
+        while True:
+            distances, candidates = tree.query(source_positions, k=k)
+            distances = np.asarray(distances).reshape(len(source_indices), -1)
+            candidates = np.asarray(candidates).reshape(len(source_indices), -1)
+            candidate_atom_indices = target_atom_indices[candidates]
+            valid = candidate_atom_indices != source_indices[:, None]
+            for row in np.flatnonzero(np.any(valid, axis=1)):
+                nearest_distances[row] = distances[row, valid[row]][0]
+            unresolved = ~np.isfinite(nearest_distances)
+            if not np.any(unresolved):
+                break
+            if k == len(target_atom_indices):
+                raise ValueError(
+                    "Could not determine a non-self nearest-neighbour distance."
+                )
+            k = min(2 * k, len(target_atom_indices))
+
+    if not np.all(np.isfinite(nearest_distances)):
+        raise ValueError("Could not determine finite nearest-neighbour distances.")
+    return round(float(np.mean(nearest_distances)), 2)
+
+def _type_labels(self, type_ids):
+    """Return readable element labels for selected type IDs."""
+    return ", ".join(
+        str(self.type_map.get(type_id, f"type {type_id}"))
+        for type_id in type_ids
+    )
+
+
+def plot_rdf_cation_anion(self,threshold_type1=2, threshold_type2=2,
                         rdf_max=3.2,
-                        vline=1.95, density=True,
-                        cation_type=1, anion_type=2,
+                        vline=None, density=True,
+                        cation_type=None, anion_type=None,
                         title=None,
                         font_weight='normal',
                         title_font_weight='normal'):
@@ -547,7 +624,8 @@ def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
     rdf_max         : float  – x-axis upper limit (Å)
     periodic        : bool   – use z-PBC
     Lims            : list   – system limits (required for PBC)
-    vline           : float  – vertical reference line position (Å)
+    vline           : float or None – reference line position (Å); when None,
+                      use the mean nearest cation–anion distance
     density         : bool   – normalise to g(r); False = raw counts
     cation_type     : int    – type id of the cation, default 1
     anion_type      : int    – type id of the anion,  default 2
@@ -556,18 +634,30 @@ def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
     title_font_weight : str  – title font weight
     """
 
-    print("TO REview")
+    _require_material(self, "oxide")
 
     Pos = self.Pos
     Types = self.Types
     Lims = self.Lims
     periodic = self.periodic
+    cation_types, anion_types, _ = _oxide_analysis_types(
+        self, cation_type, anion_type
+    )
+
+    cation_label = _type_labels(self, cation_types)
+    anion_label = _type_labels(self, anion_types)
+
+    if vline is None:
+        vline = _mean_nearest_pair_distance(
+            Pos, Types, cation_types, anion_types,
+            periodic=periodic and len(Lims) > 0, Lims=Lims,
+        )
 
     Dist_list, _, _ = compute_hist_neighbors(
         Pos, Types,
         threshold_type1=threshold_type1, threshold_type2=threshold_type2,
         periodic=periodic, Lims=Lims, rdf_max=rdf_max,
-        cation_type=cation_type, anion_type=anion_type,
+        cation_type=cation_types, anion_type=anion_types, hydroxyl_type=(),
     )
     Dist_list = [k for j in Dist_list for k in j]
 
@@ -587,37 +677,40 @@ def plot_rdf_type1type2(self,threshold_type1=2, threshold_type2=2,
     if density:
         radius = ((np.roll(edges, 1) + edges) / 2)[1:]
         dr  = radius[1] - radius[0]
-        g_r = counts / ((4 * np.pi * radius**2 * dr) * np.sum(Types == cation_type))
+        g_r = counts / (
+            (4 * np.pi * radius**2 * dr)
+            * np.sum(np.isin(Types, cation_types))
+        )
         for rect, val in zip(patches, g_r):
             rect.set_height(val)
-        ax.set_ylabel("g(r)", color='black', weight=font_weight, fontsize=30)
+        ax.set_ylabel("g(r)", color='black', weight=font_weight, fontsize=20)
         ax.set_ylim(0, 2)
     else:
-        ax.set_ylabel("Number", color='black', weight=font_weight, fontsize=30)
+        ax.set_ylabel("Number", color='black', weight=font_weight, fontsize=20)
 
-    plot_title = title if title else f"RDF type{cation_type}–type{anion_type}"
-    ax.set_title(plot_title, color='black', weight=title_font_weight, fontsize=30)
-    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=30)
+    plot_title = title if title else f"RDF {cation_label}–{anion_label}"
+    ax.set_title(plot_title, color='black', weight=title_font_weight, fontsize=20)
+    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=20)
 
     tick_locs = [k for k in range(int(rdf_max))] + [vline]
     ax.set_xticks(tick_locs)
-    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=30)
-    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=5,
+    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=20)
+    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=3,
                label=f"Bond distance {vline} Å")
-    ax.legend(prop={'size': 25, 'weight': font_weight})
+    ax.legend(prop={'size': 15, 'weight': font_weight})
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
     ax.tick_params(width=5, length=5, color='black')
     ax.set_xlim(0, rdf_max)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=30)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=30)
+    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
+    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
     plt.tight_layout()
     plt.savefig("rdf_oxide.svg")
     plt.show()
 
-helix.plot_rdf_type1type2 = plot_rdf_type1type2
+Helix.plot_rdf_cation_anion = plot_rdf_cation_anion
 
-def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4.0,
-                   vline=2.95,
+def plot_rdf_metal(self, type_id=None, cube=50, a_theory=4.078, bins=100, rdf_max=4.0,
+                   vline=None,
                    font_weight='normal', title_font_weight='normal'):
     """
     Plot the metal–metal RDF.
@@ -631,23 +724,28 @@ def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4
     rdf_max       : float – RDF cutoff (Å), default 4.0
     periodic      : bool  – apply z-PBC
     Lims          : list  – system limits (required for PBC)
-    vline         : float – reference bond distance marker (Å)
+    vline         : float or None – reference distance marker (Å); when None,
+                    use the mean nearest metal–metal distance
     font_weight, title_font_weight : str – matplotlib font weight strings
     """
-
-    print("TO REview")
 
     Pos = self.Pos
     Types = self.Types
     Lims = self.Lims
     periodic = self.periodic
 
+    metal_type_ids = _metal_type_ids(self, type_id)
     threshold  = rdf_max
-    Pos_metal  = Pos
+    Pos_metal  = Pos[np.isin(Types, metal_type_ids)]
     N          = len(Pos_metal)
     if N == 0:
-        print(f"No atoms with type_id={type_id} found.")
-        return
+        raise ValueError(f"No atoms found for metal type id(s) {metal_type_ids}.")
+    if vline is None:
+        vline = _mean_nearest_pair_distance(
+            Pos, Types, metal_type_ids, metal_type_ids,
+            periodic=periodic and len(Lims) > 0, Lims=Lims,
+            exclude_same_atoms=True,
+        )
 
     Lx, Ly, Lz = np.max(Pos_metal, axis=0)
     lx, ly, lz = np.min(Pos_metal, axis=0)
@@ -730,33 +828,33 @@ def plot_rdf_metal(self, type_id=1, cube=50, a_theory=4.078, bins=100, rdf_max=4
     for rect, val in zip(patches, g_r):
         rect.set_height(val)
 
-    ax.set_title("RDF Metal–Metal", color='black', weight=title_font_weight, fontsize=30)
-    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=30)
-    ax.set_ylabel("g(r)",         color='black', weight=font_weight, fontsize=30)
+    ax.set_title("RDF Metal–Metal", color='black', weight=title_font_weight, fontsize=20)
+    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=20)
+    ax.set_ylabel("g(r)",         color='black', weight=font_weight, fontsize=20)
     tick_locs = [k for k in range(int(rdf_max))] + [vline]
     ax.set_xticks(tick_locs)
-    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=30)
-    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=5,
+    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=20)
+    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=3,
                label=f"Bond distance {vline} Å")
     ax.legend(prop={'size': 25, 'weight': font_weight})
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
     ax.tick_params(width=5, length=10, color='black')
     ax.set_xlim(0, rdf_max)
     ax.set_ylim(0, 2)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=30)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=30)
+    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
+    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
     plt.tight_layout()
     plt.savefig("rdf_metal.svg")
 
 
-helix.plot_rdf_metal = plot_rdf_metal
+Helix.plot_rdf_metal = plot_rdf_metal
 
 # ---------------------------------------------------------------------------
-# Metal structure validation
+# Plot coordination check
 # ---------------------------------------------------------------------------
 
-def check_metal_structure(type_id=1,
-                          a_theory=4.078,
+def plot_coordination_metal(self, type_id=None,
+                          a_theory=None,
                           threshold_nn=3.2,
                           cube=30,
                           plot=True,
@@ -784,20 +882,32 @@ def check_metal_structure(type_id=1,
                     n_isolated, strain_mean/std
     """
 
-    print("TO REview")
-
     Pos = self.Pos
     Types = self.Types
+
+    metal_type_ids = _metal_type_ids(self, type_id)
+    if a_theory is None:
+        symbols = {
+            self.type_map[type_id]
+            for type_id in metal_type_ids
+            if type_id in self.type_map
+        }
+        fcc_lattice_parameters = {"Au": 4.078, "Ag": 4.086, "Cu": 3.615}
+        if len(symbols) != 1 or not symbols <= fcc_lattice_parameters.keys():
+            raise ValueError(
+                "a_theory must be provided unless one supported FCC metal is selected."
+            )
+        a_theory = fcc_lattice_parameters[symbols.pop()]
 
     d_NN     = a_theory / np.sqrt(2)
     d_min_ok = 0.85 * d_NN
     pad      = threshold_nn + 0.2
 
-    metal_pos = Pos[Types == type_id]
+    metal_pos = Pos[np.isin(Types, metal_type_ids)]
     N = len(metal_pos)
     if N == 0:
-        raise ValueError(f"No atoms with type_id={type_id} found.")
-    print(f"Checking {N} metal atoms (type {type_id})")
+        raise ValueError(f"No atoms found for metal type id(s) {metal_type_ids}.")
+    print(f"Checking {N} metal atoms (type id(s) {metal_type_ids})")
 
     lx, ly, lz = np.min(metal_pos, axis=0)
     Lx, Ly, Lz = np.max(metal_pos, axis=0)
@@ -868,7 +978,7 @@ def check_metal_structure(type_id=1,
     for spine in ax.spines.values():
         spine.set_linewidth(5)
 
-    bars = ax.bar(cn_vals, cn_freqs, color=purple, edgecolor=dark_purple, linewidth=5)
+    bars = ax.bar(cn_vals, cn_freqs, color=purple, edgecolor=dark_purple, linewidth=3)
 
     top_three = sorted(
         [(val / N * 100, bar, val) for bar, val in zip(bars, cn_freqs)],
@@ -885,19 +995,23 @@ def check_metal_structure(type_id=1,
 
     ax.set_title("Coordination number distribution", color='black',
                  weight=title_font_weight, fontsize=30)
-    ax.set_xlabel("Coordination number", color='black', weight=font_weight, fontsize=30)
-    ax.set_ylabel("Number of atoms",     color='black', weight=font_weight, fontsize=30)
+    ax.set_xlabel("Coordination number", color='black', weight=font_weight, fontsize=20)
+    ax.set_ylabel("Number of atoms",     color='black', weight=font_weight, fontsize=20)
     ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
     ax.xaxis.set_major_locator(ticker.MaxNLocator(nbins=5))
     ax.tick_params(width=5, length=5, color=dark_purple)
     ax.set_xlim(4, 14)
     ax.set_ylim(0, max(cn_freqs) * 1.15)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=30)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=30)
+    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
+    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
     plt.tight_layout()
     plt.savefig("coordination_metal.svg")
+    plt.show()
 
     return report
+
+
+Helix.plot_coordination_metal = plot_coordination_metal
 
 
 # ---------------------------------------------------------------------------
@@ -954,7 +1068,7 @@ def plot_compute_analysis(self, hist_Dens, hist_Si, hist_O,
     print(Counts)
     return [hist_Dens, hist_Si, hist_O], Counts
 
-helix.plot_compute_analysis = plot_compute_analysis
+Helix.plot_compute_analysis = plot_compute_analysis
 
 def plot_analysis(Counts_Hists, Counts, hist_Dens, hist_Si, hist_O):
     """Update histogram bar heights (used by analyze_mult)."""
@@ -1291,7 +1405,7 @@ def plot_analyze_defects(self, Cycles=None, L_cycles=None,
         plotter.add_mesh(smooth, opacity=0.1, color="red", name="contour")
         plotter.show()
 
-helix.plot_analyze_defects = plot_analyze_defects
+Helix.plot_analyze_defects = plot_analyze_defects
 
 def plot_analyze_density(self, d_spacing=5, isovalue=2., alpha=2., prec=20,
                     d=10, length_box=20, smoothing=1000, N_th=8):
@@ -1730,4 +1844,4 @@ def visualize_close_contacts(self, threshold=1.0,
         )
     plotter.show()
 
-helix.visualize_close_contacts = visualize_close_contacts
+Helix.visualize_close_contacts = visualize_close_contacts
