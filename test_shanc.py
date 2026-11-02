@@ -46,7 +46,7 @@ test_construction_helix()
 
 def test_read():
     file_cuboid = "cuboid.data"
-    helix = shanc.create_helix_from_file(file_cuboid, frame=-1, data_file=None,
+    helix = shanc.Helix.create_helix_from_file(file_cuboid, frame=-1, data_file=None,
                              type_map={1: "Au"},
                              atom_style="atom")
     print("Lims",helix.Lims)
@@ -58,7 +58,7 @@ def test_read():
 
 def test_analysis_oxide():
     file_helix = "shanc/demo_system/SiO2/last_timestep.lammpstrj"
-    helix = shanc.create_helix_from_file(file_helix, frame=-1, data_file=None,
+    helix = shanc.Helix.create_helix_from_file(file_helix, frame=-1, data_file=None,
                                  type_map={1: "Si", 2:"O", 3:"O", 4:"H"},
                                  atom_style="atom")
     helix.plot_structure()
@@ -69,7 +69,7 @@ def test_analysis_oxide():
 
 def test_analysis_metal():
     file_helix = "shanc/demo_system/Au/au_helix_relaxed.lammpstrj"
-    helix = shanc.create_helix_from_file(file_helix, frame=-1, data_file=None,
+    helix = shanc.Helix.create_helix_from_file(file_helix, frame=-1, data_file=None,
                                     type_map={1: "Au"},
                                     atom_style="atom")
     helix.plot_structure()
