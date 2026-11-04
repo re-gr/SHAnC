@@ -62,8 +62,9 @@ def test_analysis_oxide():
                                  type_map={1: "Si", 2:"O", 3:"O", 4:"H"},
                                  atom_style="atom")
     helix.plot_structure()
-    helix.plot_rdf_cation_anion()
-    helix.plot_coordination_oxide()
+#    helix.plot_rdf_cation_anion()
+#    helix.plot_coordination_oxide()
+    helix.plot_coordination_rdf()
     assert 1
 
 
@@ -73,8 +74,9 @@ def test_analysis_metal():
                                     type_map={1: "Au"},
                                     atom_style="atom")
     helix.plot_structure()
-    helix.plot_rdf_metal()
-    helix.plot_coordination_metal()
+#    helix.plot_rdf_metal()
+#    helix.plot_coordination_metal()
+    helix.plot_coordination_rdf()
     assert 1
 
 
