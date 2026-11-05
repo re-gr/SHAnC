@@ -48,20 +48,20 @@ In order to do that, one can use the following script::
 Helix Creation and Visualisation
 --------------------------------
 
-Now that the parameters have been set, one can create the helix using the homonymous method :doc:`create_helix<../api/methods/create_helix>`::
+Now that the parameters have been set, one can create the helix using the homonymous method :doc:`shanc.create_helix<../api/methods/create_helix>`::
 
   helix.create_helix()
 
 This will create a new file, "helix.data" (the generated name can be changed by using the keywords of the function). This file is a data file that can be loaded through LAMMPS which contains all the information necessary to do the dynamics.
 
-Before doing the dynamic, it is recommended to visualise what has been produced by the code. To do that one can use the method :doc:`plot_structure<../api/methods/plot_structure>`::
+Before doing the dynamic, it is recommended to visualise what has been produced by the code. To do that one can use the method :doc:`Helix.plot_structure<../api/methods/plot_structure>`::
 
   helix.plot_structure()
 
 Summary
 -------
 
-The following code should produce the "helix.data" file and the generated structure should look like this.
+The following code produces the "helix.data" file and the generated structure should look like this.
 
 
 .. pyvista-plot::
@@ -76,6 +76,6 @@ The following code should produce the "helix.data" file and the generated struct
   diameter = 60.
   turns = 1
 
-  helix = shanc.helix(pitch=pitch,width=width,thickness=thickness,diameter=diameter,turns=turns,file_lattice=file_lattice)
+  helix = shanc.Helix(pitch=pitch,width=width,thickness=thickness,diameter=diameter,turns=turns,file_lattice=file_lattice)
   helix.create_helix()
   helix.plot_structure()

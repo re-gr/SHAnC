@@ -1,4 +1,4 @@
-helix.create_helix
+Helix.create_helix
 ==================
 
-.. automethod:: shanc::helix.create_helix
+.. automethod:: shanc::Helix.create_helix

@@ -24,6 +24,6 @@ SHAnC API
 Here one can find all the functions and methods that can be used in SHAnC.
 
 .. toctree::
-    :maxdepth: 4
+    :maxdepth: 2
 
     shanc_api

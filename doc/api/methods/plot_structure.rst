@@ -1,4 +1,4 @@
-helix.plot_structure
+Helix.plot_structure
 ====================
 
-.. automethod:: shanc::helix.plot_structure
+.. automethod:: shanc::Helix.plot_structure
