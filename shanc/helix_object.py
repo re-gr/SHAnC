@@ -404,6 +404,7 @@ class Helix:
         if mass_map != {}:
             self.mass_map = mass_map
 
+
     def set_bonds_mapping(self,bonds_mapping):
         """
         set_bonds_mapping(bonds_mapping)
@@ -422,3 +423,26 @@ class Helix:
             None
         """
         self.bonds_mapping = bonds_mapping
+
+
+    def create_helix_from_file(file, do_scale=True, atom_style="atom", type_map = None, mass_map = None):
+        """
+        read_structure_from_data(file, do_scale=True, atom_style="full")
+
+        This function tries to read a structure file from a file.
+        The format of the file should be .data, .xyz or .lmmpstrj
+
+        SHould be used to display after dynamics
+
+        """
+
+        Atom_pos, Atom_types, Lims, parsed_mass_map, parsed_type_map = read_structure_from_file(file, do_scale=do_scale, atom_style=atom_style)
+
+        helix_created = Helix()
+
+        resolved_type_map = parsed_type_map if type_map is None else type_map
+        resolved_mass_map = parsed_mass_map if mass_map is None else mass_map
+
+        helix_created.set_atoms(Atom_pos,Atom_types,Lims,[],[], type_map=resolved_type_map, mass_map=resolved_mass_map)
+
+        return helix_created
