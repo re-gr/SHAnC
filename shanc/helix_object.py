@@ -58,8 +58,6 @@ class Helix:
                 The position of the atoms of the cast
             Types_cast : list
                 The type of the atoms of the cast
-            Lims_cast : list
-                The limit coordinates of the cast
             Pos_lattice : list
                 The position of the atoms for the lattice
             Types_lattice : list
@@ -100,13 +98,14 @@ class Helix:
         self.Angles = []
         self.type_map = {}
         self.mass_map = {}
+        self.bonds_mapping = {}
+        self.threshold_map = {}
 
         #Values cast
         self.cast = False
         self.int_thick = 0.
         self.Pos_cast = []
         self.Types_cast = []
-        self.Lims_cast = []
 
         #Values lattice
         self.Pos_lattice = []
@@ -122,6 +121,9 @@ class Helix:
         self.periodic = True
 
         self.file_lattice = file_lattice
+
+
+        self.rdf = []
 
         if file_lattice != "":
             try:
@@ -401,3 +403,22 @@ class Helix:
             self.type_map = type_map
         if mass_map != {}:
             self.mass_map = mass_map
+
+    def set_bonds_mapping(self,bonds_mapping):
+        """
+        set_bonds_mapping(bonds_mapping)
+
+        Sets the mapping for the count of bonds.
+        This is used when trying to plot the defects of the system.
+        One can set a list for multiple acceptable number of bonds.
+
+        Parameters
+        ----------
+            bonds_mapping : dict
+                the bonds mapping
+
+        Returns
+        -------
+            None
+        """
+        self.bonds_mapping = bonds_mapping
