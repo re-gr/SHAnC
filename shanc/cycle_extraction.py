@@ -12,6 +12,122 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from shanc.analysis import *
 
 
+
+#############TO CORRECT
+def compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[],rdf_max=5):
+    """
+    compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[])
+
+    Compute the bonds that can be used to create a graph.
+    The output is a neighbor matrix array taht can be converted to a graph using networkx nx.from_numpy_array
+
+    Parameters
+    ----------
+
+    Pos : array
+        The position of the atoms of the system
+    Types: array
+        The types of the atoms of the system
+    cube: float, optional
+        The edge of the cubes used to divide the system, 30 by default. Larger cubes are faster but are more memory intensive
+    threshold_Si : float, optional
+        The threshold used to consider if Si and O are bonding. 2 by default
+    threshold_O : float, optional
+        The threshold used to consider if O and Si are bonding. 2 by default
+    threshold_H : float, optional
+        The threshold used to consider if O and H are bonding. 1.3 by default
+    periodic : bool, optional
+        Compute as if the system was periodic, True by default
+    Lims : list, optional
+        The limits of the system. It is necessary for periodic computations
+
+    Returns
+    -------
+        Neighbor matrix of the system
+
+    """
+
+    Lx,Ly,Lz = np.max(Pos,axis=0)
+    lx,ly,lz = np.min(Pos,axis=0)
+    if periodic:
+        if len(Lims) == 0:
+            print("No limits were provided, the system will be taken as NON PERIODIC. Use the Lim keyword to add limits")
+            periodic = False
+        else:
+            lz,Lz = Lims[2]
+
+
+    Nx = int((Lx - lx) // cube + 1)
+    Ny = int((Ly - ly) // cube + 1)
+    Nz = int((Lz - lz) // cube + 1)
+
+    Pos_added = np.copy(Pos)
+    Types_added = np.copy(Types)
+
+    Num_Si_or = np.sum(Types==1)
+
+
+    if periodic:
+        #Adds atoms to the system periodically to account for the periodicity
+        Dz = Lz-lz
+
+        Pos_add_z = Pos[:,2] > (Lz - rdf_max)
+        Pos_remove_z = Pos[:,2] < (lz + rdf_max)
+
+        Pos_add_Lz = Pos[Pos_add_z] - np.array([[0,0,Dz]])
+        Pos_remove_Lz = Pos[Pos_remove_z] + np.array([[0,0,Dz]])
+
+        Pos_add = np.append(Pos_add_Lz,Pos_remove_Lz,axis=0)
+        Pos_added = np.append(Pos_added,Pos_add,axis=0)
+
+        Types_add = np.append(Types[Pos_add_z],Types[Pos_remove_z],axis=0)
+        Types_added = np.append(Types_added,Types_add,axis=0)
+
+
+    Num_Si = np.sum(Types_added==1)
+    Bonds_tot = np.zeros((Num_Si,Num_Si))
+    for x in range(Nx):
+        for y in range(Ny):
+            for z in range(Nz):
+
+                #Slice the system inside this cube
+                Pos_trunc_x = (Pos_added[:,0] > (x*cube + lx - threshold_Si - 0.2)) * (Pos_added[:,0] < ((x+1)*cube + lx + threshold_Si + 0.2))
+                Pos_trunc_y = (Pos_added[:,1] > (y*cube + ly - threshold_Si - 0.2)) * (Pos_added[:,1] < ((y+1)*cube + ly + threshold_Si + 0.2))
+                Pos_trunc_z = (Pos_added[:,2] > (z*cube + lz - threshold_Si - 0.2)) * (Pos_added[:,2] < ((z+1)*cube + lz + threshold_Si + 0.2))
+                Pos_trunc_ind = Pos_trunc_x * Pos_trunc_y * Pos_trunc_z
+                Pos_trunc = Pos_added[Pos_trunc_ind]
+                Types_trunc = Types_added[Pos_trunc_ind]
+                if (Types_trunc == 1).any() and (Types_trunc==2).any():
+
+                    Bonds = _compute_bonds(Pos_trunc,Types_trunc,threshold_type1=threshold_Si,threshold_type2=threshold_O,threshold_H=threshold_H)[0]
+                    Bonds = Bonds.astype("float")
+                    #Get Bonds Si
+                    Bonds = Bonds.dot(Bonds.transpose())
+                    #Set distance to 1
+                    Bonds = Bonds / (Bonds + (Bonds==0)*1)
+                    Pos_trunc_ind_Si = Pos_trunc_ind[Types_added==1]
+
+                    Pos_trunc_ind_Si = np.matmul(Pos_trunc_ind_Si.reshape((len(Pos_trunc_ind_Si),1)),Pos_trunc_ind_Si.reshape((1,len(Pos_trunc_ind_Si))))
+
+                    Bonds_tot[Pos_trunc_ind_Si] = Bonds_tot[Pos_trunc_ind_Si] + Bonds.ravel()
+    Bonds_tot_or = Bonds_tot[:Num_Si_or]
+
+
+    if periodic:
+        Pos_add_z_Si = Pos_add_z[Types==1]
+        Pos_remove_z_Si = Pos_remove_z[Types==1]
+        num_add = np.sum(Pos_add_z_Si)
+
+        Bonds_tot_or[Pos_add_z_Si] = Bonds_tot_or[Pos_add_z_Si] + Bonds_tot[Num_Si_or:Num_Si_or+num_add]
+        Bonds_tot_or[Pos_remove_z_Si] = Bonds_tot_or[Pos_remove_z_Si] + Bonds_tot[Num_Si_or+num_add:]
+        Bonds_tot_or = Bonds_tot_or[:,:Num_Si_or]
+
+    Bonds_tot_or = Bonds_tot_or + Bonds_tot_or.transpose()
+    Bonds_tot_or = Bonds_tot_or / (Bonds_tot_or + (Bonds_tot_or==0)*1)
+    Bonds_tot_or = Bonds_tot_or - np.eye(len(Bonds_tot_or)) * Bonds_tot_or
+    return Bonds_tot_or
+
+
 # ---------------------------------------------------------------------------
 # Cycle plotting and filtering helpers
 # ---------------------------------------------------------------------------

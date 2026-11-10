@@ -25,7 +25,8 @@ from shanc.helix_object import *
 from scipy.spatial import KDTree
 import matplotlib.ticker as ticker
 
-
+# Colours extracted from Jmol
+# https://jmol.sourceforge.net/jscolors/
 ELEMENT_COLOURS = {
     "H":	[255,255,255], "He":	[217,255,255], "Li":	[204,128,255], "Be":	[194,255,0],
     "B":	[255,181,181],  "C":	[72,72,72],     "N":	[48,80,248]	,   "O":	[255,13,13]	,
@@ -59,7 +60,7 @@ ELEMENT_COLOURS = {
     "Ts":[250,0,0],        "Og":[250,0,0]
 }
 
-ELEMENT_RADIUS = dict_radii={
+ELEMENT_RADIUS = {
     'H':0.83, 'He':0.87, 'Li':0.91, 'Be':0.94, 'B':0.97, 'C':0.99, 'N':1.01, 'O':1.04, 'F':1.06, 'Ne':1.07, 'Na':1.09, 'Mg':1.11, 'Al':1.12,
     'Si':1.14, 'P':1.15, 'S':1.16, 'Cl':1.18, 'Ar':1.19, 'K':1.2, 'Ca':1.21, 'Sc':1.22, 'Ti':1.23, 'V':1.24, 'Cr':1.25, 'Mn':1.26, 'Fe':1.26,
     'Co':1.27, 'Ni':1.28, 'Cu':1.41, 'Zn':1.41, 'Ga':1.3, 'Ge':1.31, 'As':1.31, 'Se':1.32, 'Br':1.33, 'Kr':1.33, 'Rb':1.34, 'Sr':1.34, 'Y':1.35,
@@ -75,27 +76,29 @@ _PURPLE = np.array([96, 25, 255]) / 255
 _DARK_PURPLE = np.array([56, 20, 180]) / 255
 _DARK_DARK_PURPLE = np.array([34, 10, 120]) / 255
 
+ELEMENT_ACCEPTABLE_BONDS = {
+    'H':1, 'Li':1, 'Be':2, 'B':3, 'C':4, 'N':3, 'O':2, 'F':1, 'Na':1, 'Mg':2, 'Al':3,
+    'Si':4, 'P':3, 'S':2, 'Cl':1
+}
+
+#Basically 2 except for H
+ELEMENTS_BONDS_THRESHOLDS = {
+    'H': 1.3, 'He': 2.0, 'Li': 2.0, 'Be': 2.0, 'B': 2.0, 'C': 2.0, 'N': 2.0, 'O': 2.0, 'F': 2.0, 'Ne': 2.0, 'Na': 2.0, 'Mg': 2.0, 'Al': 2.0, 'Si': 2.0, 'P': 2.0, 'S': 2.0, 'Cl': 2.0, 'Ar': 2.0, 'K': 2.0, 'Ca': 2.0, 'Sc': 2.0, 'Ti': 2.0, 'V': 2.0, 'Cr': 2.0, 'Mn': 2.0, 'Fe': 2.0, 'Co': 2.0, 'Ni': 2.0, 'Cu': 2.0, 'Zn': 2.0, 'Ga': 2.0, 'Ge': 2.0, 'As': 2.0, 'Se': 2.0, 'Br': 2.0, 'Kr': 2.0, 'Rb': 2.0, 'Sr': 2.0, 'Y': 2.0, 'Zr': 2.0, 'Nb': 2.0, 'Mo': 2.0, 'Tc': 2.0, 'Ru': 2.0, 'Rh': 2.0, 'Pd': 2.0, 'Ag': 2.0, 'Cd': 2.0, 'In': 2.0, 'Sn': 2.0, 'Sb': 2.0, 'Te': 2.0, 'I': 2.0, 'Xe': 2.0, 'Cs': 2.0, 'Ba': 2.0, 'La': 2.0, 'Ce': 2.0, 'Pr': 2.0, 'Nd': 2.0, 'Pm': 2.0, 'Sm': 2.0, 'Eu': 2.0, 'Gd': 2.0, 'Tb': 2.0, 'Dy': 2.0, 'Ho': 2.0, 'Er': 2.0, 'Tm': 2.0, 'Yb': 2.0, 'Lu': 2.0, 'Hf': 2.0, 'Ta': 2.0, 'W': 2.0, 'Re': 2.0, 'Os': 2.0, 'Ir': 2.0, 'Pt': 2.0, 'Au': 2.0, 'Hg': 2.0, 'Tl': 2.0, 'Pb': 2.0, 'Bi': 2.0, 'Po': 2.0, 'At': 2.0, 'Rn': 2.0, 'Fr': 2.0, 'Ra': 2.0, 'Ac': 2.0, 'Th': 2.0, 'Pa': 2.0, 'U': 2.0, 'Np': 2.0, 'Pu': 2.0, 'Am': 2.0, 'Cm': 2.0, 'Bk': 2.0, 'Cf': 2.0, 'Es': 2.0, 'Fm': 2.0, 'Md': 2.0, 'No': 2.0, 'Lr': 2.0, 'Rf': 2.0, 'Db': 2.0, 'Sg': 2.0, 'Bh': 2.0, 'Hs': 2.0, 'Mt': 2.0, 'Ds': 2.0, 'Rg': 2.0, 'Cn': 2.0, 'Nh': 2.0, 'Fl': 2.0, 'Mc': 2.0, 'Lv': 2.0, 'Ts': 2.0, 'Og': 2.0
+}
+
+
 
 # ---------------------------------------------------------------------------
 # Bond computation
 # ---------------------------------------------------------------------------
 
-def _compute_bonds(Pos, Types,
-                  threshold_type1=2, threshold_type2=2, threshold_H=1.3,
-                  do_count_type_3=True,
-                  cation_type=1, anion_type=2, metal=False,
-                  hydroxyl_type=3, hydrogen_type=4):
+def _compute_bonds(Pos, Types, type_map, threshold_map, threshold_mult = 1.3):
     """
     Compute the bonds of an oxide system.
 
     |!| This version must only be used for small systems; it builds the full
     distance matrix and is memory-intensive for large systems.
 
-    Atom type conventions (default SiO2):
-        1 : cation  (Si)
-        2 : anion   (O)
-        3 : OH oxygen
-        4 : H
 
     Parameters
     ----------
@@ -112,167 +115,34 @@ def _compute_bonds(Pos, Types,
     -------
     Bonds, Cat_count_An, An_count_Cat, O_count_H, H_count_O
     """
-    if metal:
-        Pos_Cat = Pos[np.isin(Types, np.atleast_1d(cation_type))]
-        Dist = sd.cdist(Pos_Cat, Pos_Cat)
-        np.fill_diagonal(Dist, np.inf)
-        Bonds = Dist < threshold_type1
-        Cat_count_An = np.sum(Bonds, axis = 1)
-        return Bonds, Cat_count_An, np.array([]), np.array([]), np.array([])
 
-    cation_mask = np.isin(Types, np.atleast_1d(cation_type))
-    anion_mask = np.isin(Types, np.atleast_1d(anion_type))
-    hydroxyl_mask = (
-        np.isin(Types, np.atleast_1d(hydroxyl_type))
-        if do_count_type_3 and hydroxyl_type is not None
-        else np.zeros(len(Types), dtype=bool)
-    )
-    Pos_Cat = Pos[cation_mask]
-    Pos_An = Pos[anion_mask | hydroxyl_mask]
+    max_type = np.max(Types)
+    Bonds = np.zeros((len(Pos),len(Pos)))
 
-    Pos_H     = Pos[np.isin(Types, np.atleast_1d(hydrogen_type))]
-    H_present = len(Pos_H) > 0
-
-    # Compute all pairwise Cat-An distances and identify bonds by cutoff.
-    Dist = sd.cdist(Pos_Cat, Pos_An)
-
-    Bonds       = (Dist < threshold_type1) | (Dist < threshold_type2)
-    Cat_count_An = np.sum(Bonds, axis=1)
-    An_count_Cat = np.sum(Bonds, axis=0)
-
-    if H_present:
-        # Also compute O–H bonding if hydrogens are present.
-        Dist_OH   = sd.cdist(Pos_H, Pos_An[:len(Pos_An)])
-        Bonds_OH  = Dist_OH < threshold_H
-        O_count_H = np.sum(Bonds_OH, axis=0)
-        H_count_O = np.sum(Bonds_OH, axis=1)
-    else:
-        O_count_H, H_count_O = np.array([]), np.array([])
-
-    return Bonds, Cat_count_An, An_count_Cat, O_count_H, H_count_O
+    Thresholds = np.array([[ min(threshold_map[type_map[Types[i_1]]],threshold_map[type_map[Types[i_2]]])  for i_1 in range(len(Pos))] for i_2 in range(len(Pos)) ]) * threshold_mult
 
 
 
-def compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[],rdf_max=5):
-    """
-    compute_bonds_graph(Pos,Types,cube=30,threshold_Si=2,threshold_O=2,threshold_H=1.3,periodic=True,Lims=[])
+    for type_ in range(max_type):
+        mask_type = (Types==type_)
+        Pos_type = Pos[mask_type]
+        Threshold_type = Thresholds[mask_type]
 
-    Compute the bonds that can be used to create a graph.
-    The output is a neighbor matrix array taht can be converted to a graph using networkx nx.from_numpy_array
+        Dist = sd.cdist(Pos_type,Pos)
+        #Remove count with itself
+        Dist = Dist + 100 * (Dist <= 1e-8)
+        mask_bonds = (Dist < Threshold_type)
 
-    Parameters
-    ----------
+        Bonds[mask_type] = Bonds[mask_type] + mask_bonds
 
-    Pos : array
-        The position of the atoms of the system
-    Types: array
-        The types of the atoms of the system
-    cube: float, optional
-        The edge of the cubes used to divide the system, 30 by default. Larger cubes are faster but are more memory intensive
-    threshold_Si : float, optional
-        The threshold used to consider if Si and O are bonding. 2 by default
-    threshold_O : float, optional
-        The threshold used to consider if O and Si are bonding. 2 by default
-    threshold_H : float, optional
-        The threshold used to consider if O and H are bonding. 1.3 by default
-    periodic : bool, optional
-        Compute as if the system was periodic, True by default
-    Lims : list, optional
-        The limits of the system. It is necessary for periodic computations
+    Bonds = (Bonds>=1)
 
-    Returns
-    -------
-        Neighbor matrix of the system
+    return Bonds
 
-    """
-
-    Lx,Ly,Lz = np.max(Pos,axis=0)
-    lx,ly,lz = np.min(Pos,axis=0)
-    if periodic:
-        if len(Lims) == 0:
-            print("No limits were provided, the system will be taken as NON PERIODIC. Use the Lim keyword to add limits")
-            periodic = False
-        else:
-            lz,Lz = Lims[2]
-
-
-    Nx = int((Lx - lx) // cube + 1)
-    Ny = int((Ly - ly) // cube + 1)
-    Nz = int((Lz - lz) // cube + 1)
-
-    Pos_added = np.copy(Pos)
-    Types_added = np.copy(Types)
-
-    Num_Si_or = np.sum(Types==1)
-
-
-    if periodic:
-        #Adds atoms to the system periodically to account for the periodicity
-        Dz = Lz-lz
-
-        Pos_add_z = Pos[:,2] > (Lz - rdf_max)
-        Pos_remove_z = Pos[:,2] < (lz + rdf_max)
-
-        Pos_add_Lz = Pos[Pos_add_z] - np.array([[0,0,Dz]])
-        Pos_remove_Lz = Pos[Pos_remove_z] + np.array([[0,0,Dz]])
-
-        Pos_add = np.append(Pos_add_Lz,Pos_remove_Lz,axis=0)
-        Pos_added = np.append(Pos_added,Pos_add,axis=0)
-
-        Types_add = np.append(Types[Pos_add_z],Types[Pos_remove_z],axis=0)
-        Types_added = np.append(Types_added,Types_add,axis=0)
-
-
-    Num_Si = np.sum(Types_added==1)
-    Bonds_tot = np.zeros((Num_Si,Num_Si))
-    for x in range(Nx):
-        for y in range(Ny):
-            for z in range(Nz):
-
-                #Slice the system inside this cube
-                Pos_trunc_x = (Pos_added[:,0] > (x*cube + lx - threshold_Si - 0.2)) * (Pos_added[:,0] < ((x+1)*cube + lx + threshold_Si + 0.2))
-                Pos_trunc_y = (Pos_added[:,1] > (y*cube + ly - threshold_Si - 0.2)) * (Pos_added[:,1] < ((y+1)*cube + ly + threshold_Si + 0.2))
-                Pos_trunc_z = (Pos_added[:,2] > (z*cube + lz - threshold_Si - 0.2)) * (Pos_added[:,2] < ((z+1)*cube + lz + threshold_Si + 0.2))
-                Pos_trunc_ind = Pos_trunc_x * Pos_trunc_y * Pos_trunc_z
-                Pos_trunc = Pos_added[Pos_trunc_ind]
-                Types_trunc = Types_added[Pos_trunc_ind]
-                if (Types_trunc == 1).any() and (Types_trunc==2).any():
-
-                    Bonds = _compute_bonds(Pos_trunc,Types_trunc,threshold_type1=threshold_Si,threshold_type2=threshold_O,threshold_H=threshold_H)[0]
-                    Bonds = Bonds.astype("float")
-                    #Get Bonds Si
-                    Bonds = Bonds.dot(Bonds.transpose())
-                    #Set distance to 1
-                    Bonds = Bonds / (Bonds + (Bonds==0)*1)
-                    Pos_trunc_ind_Si = Pos_trunc_ind[Types_added==1]
-
-                    Pos_trunc_ind_Si = np.matmul(Pos_trunc_ind_Si.reshape((len(Pos_trunc_ind_Si),1)),Pos_trunc_ind_Si.reshape((1,len(Pos_trunc_ind_Si))))
-
-                    Bonds_tot[Pos_trunc_ind_Si] = Bonds_tot[Pos_trunc_ind_Si] + Bonds.ravel()
-    Bonds_tot_or = Bonds_tot[:Num_Si_or]
-
-
-    if periodic:
-        Pos_add_z_Si = Pos_add_z[Types==1]
-        Pos_remove_z_Si = Pos_remove_z[Types==1]
-        num_add = np.sum(Pos_add_z_Si)
-
-        Bonds_tot_or[Pos_add_z_Si] = Bonds_tot_or[Pos_add_z_Si] + Bonds_tot[Num_Si_or:Num_Si_or+num_add]
-        Bonds_tot_or[Pos_remove_z_Si] = Bonds_tot_or[Pos_remove_z_Si] + Bonds_tot[Num_Si_or+num_add:]
-        Bonds_tot_or = Bonds_tot_or[:,:Num_Si_or]
-
-    Bonds_tot_or = Bonds_tot_or + Bonds_tot_or.transpose()
-    Bonds_tot_or = Bonds_tot_or / (Bonds_tot_or + (Bonds_tot_or==0)*1)
-    Bonds_tot_or = Bonds_tot_or - np.eye(len(Bonds_tot_or)) * Bonds_tot_or
-    return Bonds_tot_or
 
 
 # Neighbour histogram (scalable, periodic-aware)
-def compute_bonds_system(Pos, Types,
-                           cube=30,
-                           threshold_type1=2, threshold_type2=2, threshold_H=1.3,
-                           periodic=True, Lims=[], rdf_max=5,
-                           cation_type=1, anion_type=2, metal = False, indices = True):
+def compute_bonds_system(helix,cube=30,rdf_max=5):
     """
     Compute bond counts and RDF distances by slicing the system into sub-cubes.
 
@@ -294,6 +164,14 @@ def compute_bonds_system(Pos, Types,
     -------
     Dist_list, Cat_count_An_tot, An_count_Cat_tot
     """
+
+    Pos = helix.Pos
+    Types = helix.Types
+    Lims = helix.Lims
+    type_map = helix.type_map
+    threshold_map = helix.threshold_map
+    periodic = helix.periodic
+
     Lx, Ly, Lz = np.max(Pos, axis=0)
     lx, ly, lz = np.min(Pos, axis=0)
 
@@ -314,9 +192,6 @@ def compute_bonds_system(Pos, Types,
     Types_added = np.copy(Types)
 
 
-    mask_Cat = (Types == cation_type)
-    mask_An = (Types == anion_type) | (Types==3) #NEED TO CHANGE HARDCODED
-
     if periodic:
         Pos_add_z    = Pos[:, 2] > (Lz - rdf_max)
         Pos_remove_z = Pos[:, 2] < (lz + rdf_max)
@@ -333,92 +208,50 @@ def compute_bonds_system(Pos, Types,
         ])
 
 
-    Num_at  = len(Types)
-    Num_Cat = np.sum(Types == cation_type)
-    Num_An  = 0 if metal else np.sum((Types == anion_type) | (Types == 3))
     In_trunc = np.array(
-        [True] * Num_at + [False] * (len(Pos_added) - Num_at), dtype=bool
+        [True] * len(Pos) + [False] * (len(Pos_added) - len(Pos)), dtype=bool
     )
 
-    if indices:
-        Bonds = []
-        Index = np.arange(len(Pos_added))
 
-        if periodic:
-            Index_small = np.arange(len(Pos))
-            Index_add = np.concatenate([Index_small[Pos_add_z],Index_small[Pos_remove_z]])
-            Index[len(Pos):] = Index_add
+    Bonds = []
+    Index = np.arange(len(Pos_added))
 
+    if periodic:
+        Index_small = np.arange(len(Pos))
+        Index_add = np.concatenate([Index_small[Pos_add_z],Index_small[Pos_remove_z]])
+        Index[len(Pos):] = Index_add
 
-    else:
-        Bonds = np.zeros((Num_Cat,Num_An))
 
     for x in range(Nx):
         for y in range(Ny):
             for z in range(Nz):
 
-                # Padded cube – for bond counting / RDF neighbours
+                #Extract small cubes to compute the bonds
                 mask_p = (
                     (Pos_added[:, 0] >= x*cube + lx - rdf_max) & (Pos_added[:, 0] < (x+1)*cube + lx + rdf_max) &
                     (Pos_added[:, 1] >= y*cube + ly - rdf_max) & (Pos_added[:, 1] < (y+1)*cube + ly + rdf_max) &
                     (Pos_added[:, 2] >= z*cube + lz - rdf_max) & (Pos_added[:, 2] < (z+1)*cube + lz + rdf_max)
                 )
+
                 Pos_trunc   = Pos_added[mask_p]
                 Types_trunc = Types_added[mask_p]
 
-                if not (np.any(Types_trunc == cation_type) and np.any(Types_trunc == anion_type)):
-                    continue
-                if not metal and not np.any(Types_trunc == cation_type):
-                    continue
 
-                bonds, _, _, _, _ = _compute_bonds(
-                    Pos_trunc, Types_trunc,
-                    threshold_type1=threshold_type1,
-                    threshold_type2=threshold_type2,
-                    threshold_H=threshold_H,
-                    do_count_type_3=True,
-                    cation_type=cation_type,
-                    anion_type=anion_type,
-                    metal = metal
-                )
+                bonds = _compute_bonds(Pos_trunc, Types_trunc, type_map, threshold_map)
 
-                mask_Cat_p = Types_trunc == cation_type
-                mask_An_p = (Types_trunc == anion_type) | (Types_trunc == 3) #TO CHANGE TOO SPECIFIC
+                index_p = Index[mask_p]
+                n_index_p = len(index_p)
+                index_bonds_p = (index_p.reshape((n_index_p,1,1)) * np.array([[1,0]]) + index_p.reshape((1,n_index_p,1)) * np.array([[0,1]])).reshape((n_index_p*n_index_p,2))
+                index_bonds_p = index_bonds_p[bonds.ravel()!=0]
 
-                if indices:
-                    index_cat_p = Index[mask_p][mask_Cat_p]
-                    index_an_p = Index[mask_p][mask_An_p]
-                    n_index_cat_p = len(index_cat_p)
-                    n_index_an_p = len(index_an_p)
-                    index_bonds_p = (index_cat_p.reshape((n_index_cat_p,1,1)) * np.array([[1,0]]) + index_an_p.reshape((1,n_index_an_p,1)) * np.array([[0,1]])).reshape((n_index_cat_p*n_index_an_p,2))
-                    index_bonds_p = index_bonds_p[bonds.ravel()!=0]
-
-                    for index_b in index_bonds_p:
-                        Bonds.append(index_b)
-
-
-
-                else:
-
-                    # print(np.shape(In_trunc[mask_p]),np.shape(In_trunc[mask_p][mask_Cat_p]),np.shape())
-                    bonds_in = bonds[In_trunc[mask_p][mask_Cat_p]][:,In_trunc[mask_p][mask_An_p]]
-
-                    ##########FORGOT TO ADD BACK PERIODIC BONDS###########
-
-                    Bonds_Cat = Bonds[mask_p[In_trunc][mask_Cat]]
-                    Bonds_Cat[:,mask_p[In_trunc][mask_An]] += bonds_in
-                    Bonds[mask_p[In_trunc][mask_Cat]] = Bonds_Cat
+                for index_b in index_bonds_p:
+                    Bonds.append(index_b)
 
 
     return np.array(Bonds)
 
 
-def compute_hist_neighbors(Pos, Types,
-                           cube=100,
-                           threshold_type1=2, threshold_type2=2, threshold_H=1.3,
-                           periodic=True, Lims=[], rdf_max=5,
-                           cation_type=1, anion_type=2, hydroxyl_type=3,
-                           metal=False):
+def compute_rdf(helix,cube=50,rdf_max=5):
     """
     Compute bond counts and RDF distances by slicing the system into sub-cubes.
 
@@ -442,6 +275,12 @@ def compute_hist_neighbors(Pos, Types,
     -------
     Dist_list, Cat_count_An_tot, An_count_Cat_tot
     """
+
+    Pos = helix.Pos
+    Types = helix.Types
+    Lims = helix.Lims
+    periodic = helix.periodic
+
     Lx, Ly, Lz = np.max(Pos, axis=0)
     lx, ly, lz = np.min(Pos, axis=0)
 
@@ -461,16 +300,6 @@ def compute_hist_neighbors(Pos, Types,
     Pos_added   = np.copy(Pos)
     Types_added = np.copy(Types)
 
-    cation_types = np.atleast_1d(cation_type)
-    anion_types = np.atleast_1d(anion_type)
-    hydroxyl_types = (
-        np.atleast_1d(hydroxyl_type)
-        if hydroxyl_type is not None
-        else np.array([])
-    )
-    anion_group_types = np.concatenate((anion_types, hydroxyl_types))
-    cation_mask = np.isin(Types, cation_types)
-    anion_group_mask = np.isin(Types, anion_group_types)
 
     if periodic:
         Pos_add_z    = Pos[:, 2] > (Lz - rdf_max)
@@ -487,93 +316,185 @@ def compute_hist_neighbors(Pos, Types,
             Types[Pos_remove_z],
         ])
 
-    Num_at  = len(Types)
-    Num_Cat = np.count_nonzero(cation_mask)
-    Num_An  = 0 if metal else np.count_nonzero(anion_group_mask)
-    In_trunc = np.array(
-        [True] * Num_at + [False] * (len(Pos_added) - Num_at), dtype=bool
-    )
-
-    Cat_count_An_tot = np.zeros(Num_Cat)
-    An_count_Cat_tot = np.zeros(Num_An)
-    Dist_list = []
+    max_types = int(np.max(Types))
+    Rdf = [ [[] for k in range(max_types)] for i in range(max_types) ]
 
     for x in range(Nx):
         for y in range(Ny):
             for z in range(Nz):
 
-                # Inner cube – atoms whose distances will be recorded
-                mask_u = (
-                    (Pos_added[:, 0] >= x*cube + lx)     & (Pos_added[:, 0] < (x+1)*cube + lx) &
-                    (Pos_added[:, 1] >= y*cube + ly)     & (Pos_added[:, 1] < (y+1)*cube + ly) &
-                    (Pos_added[:, 2] >= z*cube + lz)     & (Pos_added[:, 2] < (z+1)*cube + lz)
-                )
-                Pos_trunc_uniq   = Pos_added[mask_u]
-                Types_trunc_uniq = Types_added[mask_u]
-
-                # Padded cube – for bond counting / RDF neighbours
+                #Extract small cubes to compute the bonds
                 mask_p = (
                     (Pos_added[:, 0] >= x*cube + lx - rdf_max) & (Pos_added[:, 0] < (x+1)*cube + lx + rdf_max) &
                     (Pos_added[:, 1] >= y*cube + ly - rdf_max) & (Pos_added[:, 1] < (y+1)*cube + ly + rdf_max) &
                     (Pos_added[:, 2] >= z*cube + lz - rdf_max) & (Pos_added[:, 2] < (z+1)*cube + lz + rdf_max)
                 )
-                Pos_trunc   = Pos_added[mask_p]
-                Types_trunc = Types_added[mask_p]
 
-                Ind_uniq_in_pad = (mask_u & In_trunc)[mask_p]
-
-                has_cation = np.any(np.isin(Types_trunc, cation_types))
-                has_anion = np.any(np.isin(Types_trunc, anion_group_types))
-                if not has_cation or (not metal and not has_anion):
-                    continue
-
-                _, Cat_count_An, An_count_Cat, _, _ = _compute_bonds(
-                    Pos_trunc, Types_trunc,
-                    threshold_type1=threshold_type1,
-                    threshold_type2=threshold_type2,
-                    threshold_H=threshold_H,
-                    do_count_type_3=True,
-                    cation_type=cation_type,
-                    anion_type=anion_type,
-                    metal=metal,
-                    hydroxyl_type=hydroxyl_type,
+                mask_u = (
+                    (Pos_added[:, 0] >= x*cube + lx) & (Pos_added[:, 0] < (x+1)*cube + lx) &
+                    (Pos_added[:, 1] >= y*cube + ly) & (Pos_added[:, 1] < (y+1)*cube + ly) &
+                    (Pos_added[:, 2] >= z*cube + lz) & (Pos_added[:, 2] < (z+1)*cube + lz)
                 )
+                #Two truncation are made
+                # One for the system + rdf distance to make sure all atoms are taken into account
+                # the other one is just the atoms where the rdf is computed
+                Pos_trunc_large   = Pos_added[mask_p]
+                Pos_trunc_small   = Pos_added[mask_u]
+                Types_trunc_large   = Types_added[mask_p]
+                Types_trunc_small   = Types_added[mask_u]
 
-                cat_mask_pad = np.isin(Types_trunc, cation_types)
+                Distances = sd.cdist(Pos_trunc_small,Pos_trunc_large)
+                for type_1 in range(max_types):
+                    for type_2 in range(max_types):
+                        T1 = (Types_trunc_small == (type_1+1))
+                        T2 = (Types_trunc_large == (type_2+1))
+                        # print(np.shape(Distances[T1]))
+                        # print(np.shape(Distances[T1][:,T2]))
 
-                Cat_count_An = Cat_count_An[Ind_uniq_in_pad[cat_mask_pad]]
-                cat_idx = mask_u[:Num_at][cation_mask]
-                Cat_count_An_tot[cat_idx] = Cat_count_An
+                        D_rdf = Distances[T1][:,T2].flatten()
+                        D_rdf = D_rdf[D_rdf <= rdf_max]
+                        Rdf[type_1][type_2] = Rdf[type_1][type_2] + D_rdf.tolist()
+    helix.rdf = Rdf
+    return Rdf
 
-                if not metal:
-                    an_mask_pad = np.isin(Types_trunc, anion_group_types)
 
-                    An_count_Cat = An_count_Cat[Ind_uniq_in_pad[an_mask_pad]]
-                    an_idx = mask_u[:Num_at][anion_group_mask]
-                    An_count_Cat_tot[an_idx] = An_count_Cat
 
-                # Distances for RDF
-                Pos_Cat_u = Pos_trunc_uniq[
-                    np.isin(Types_trunc_uniq, cation_types)
-                ]
-                if metal:
-                    if len(Pos_Cat_u) < 2:
-                        continue
-                    D = sd.cdist(Pos_Cat_u, Pos_Cat_u)
-                    np.fill_diagonal(D, np.inf)
-                else:
-                    anion_group_u = np.isin(
-                        Types_trunc_uniq, anion_group_types
-                    )
-                    Pos_An_u = Pos_trunc_uniq[anion_group_u]
-                    if len(Pos_Cat_u) == 0 or len(Pos_An_u) == 0:
-                        continue
-                    D = sd.cdist(Pos_Cat_u, Pos_An_u)
-                    D[D == 0] = 100
+def _convert_symbol_to_type(type_map,symbol):
+    """convert a symbol to multiple types if possible"""
+    if type_map == {}: raise ValueError("A symbol was used to select atom types, but no mapping was provided")
+    else:
+        T = []
+        for ty in type_map:
+            print(ty,symbol,type_map[ty])
+            if type_map[ty] == symbol:
+                T.append(ty)
+    return T
 
-                Dist_list.append(D[D < rdf_max].ravel())
+def _clean_type(helix,ty):
+    """clean the types to be more usable"""
+    T = []
+    label = ""
+    if type(ty) == int:
+        T = [ty]
+        label = str(ty)
+    elif type(ty) == list:
+        for t in ty:
+            if type(t) == str:
+                t = _convert_symbol_to_type(helix.type_map,t)
+            T = T+t
+            label += str(t)+","
+        label = label[:-1]
 
-    return Dist_list, Cat_count_An_tot[:Num_Cat], An_count_Cat_tot[:Num_An]
+    elif type(ty) == str:
+        ty = ty.split(",")
+        for t in ty:
+            t = _convert_symbol_to_type(helix.type_map,t)
+            T = T+t
+        label = ty
+
+    return T,label
+
+
+def plot_rdf(self,type_1,type_2,cube=50, rdf_max=5, density=True,
+                        vline=None,
+                        title=None,
+                        plot=False,
+                        file_name="rdf.svg",
+                        save=True):
+    """
+    Plot the RDF between cation (type 1) and anion (type 2) atoms.
+
+    Parameters
+    ----------
+    Pos, Types      : positions and types array
+    rdf_max         : float  – x-axis upper limit (Å)
+    periodic        : bool   – use z-PBC
+    Lims            : list   – system limits (required for PBC)
+    vline           : float or None – reference line position (Å); when None,
+                      use the mean nearest cation–anion distance
+    density         : bool   – normalise to g(r); False = raw counts
+    cation_type     : int    – type id of the cation, default 1
+    anion_type      : int    – type id of the anion,  default 2
+    title           : str    – plot title (auto-generated if None)
+    font_weight     : str    – tick/label font weight
+    title_font_weight : str  – title font weight
+    """
+
+
+
+    rdf = self.rdf
+    if not len(rdf):
+        rdf = compute_rdf(self,cube=cube,rdf_max=rdf_max)
+
+    T1,label_1 = _clean_type(self,type_1)
+    T2,label_2 = _clean_type(self,type_2)
+
+    print(T1,T2)
+    print(type_1,type_2)
+    print(self.type_map)
+
+    Dist_list = []
+    count = 0
+    for t1 in T1:
+        for t2 in T2:
+            Dist_list += rdf[t1-1][t2-1]
+    for t2 in T2:
+        count += np.sum(self.Types==t2)
+    print(T1,T2,count)
+
+    # if vline is None:
+    #     vline = _mean_nearest_pair_distance(
+    #         Pos, Types, cation_types, anion_types,
+    #         periodic=periodic and len(Lims) > 0, Lims=Lims,
+    #     )
+
+    purple           = _PURPLE
+    dark_purple      = _DARK_PURPLE
+    dark_dark_purple = _DARK_DARK_PURPLE
+
+    fig,ax = plt.subplots(figsize=(8, 6), dpi=200)
+    plt.rcParams.update({'font.size': 15})
+    plt.rcParams['svg.fonttype'] = 'none'
+
+    counts, edges, patches = plt.hist(
+        Dist_list, bins=100, range=(0, rdf_max),
+        color=purple, edgecolor=dark_purple, linewidth=1,
+    )
+
+    if density:
+        radius = ((np.roll(edges, 1) + edges) / 2)[1:]
+        dr  = radius[1] - radius[0]
+        g_r = counts / ((4 * np.pi * radius**2 * dr) * count)
+        for rect, val in zip(patches, g_r):
+            rect.set_height(val)
+        plt.ylabel("g(r)", color=purple,size=17)
+        ax.set_ylim(0, np.max(g_r)*1.2)
+    else:
+        plt.ylabel("Number", color=purple,size=17)
+
+    plot_title = title if title else f"RDF {label_1}–{label_2}"
+    # plt.title(plot_title, color=purple)
+    plt.xlabel("Distance (Å)", color=purple,size=17)
+
+    # if vline:
+    #     tick_locs = [k for k in range(int(rdf_max))] + [vline]
+    #     ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=3,
+    #            label=f"Bond distance {vline} Å")
+    # else:
+    tick_locs = [k for k in range(int(rdf_max))]
+
+    plt.xticks(tick_locs,color=purple,size=17)
+    plt.yticks(color=purple,size=17)
+    plt.xlim(0, rdf_max)
+
+    plt.tight_layout()
+    if save:
+        plt.savefig(file_name)
+    if plot:
+        plt.show()
+
+Helix.plot_rdf = plot_rdf
+
 
 
 
@@ -827,248 +748,6 @@ def _mean_nearest_pair_distance(Pos, Types, source_types, target_types,
     return round(float(np.mean(nearest_distances)), 2)
 
 
-def plot_rdf_cation_anion(self,threshold_type1=2, threshold_type2=2,
-                        rdf_max=3.2,
-                        vline=None, density=True,
-                        cation_type=None, anion_type=None,
-                        title=None,
-                        font_weight='normal',
-                        title_font_weight='normal'):
-    """
-    Plot the RDF between cation (type 1) and anion (type 2) atoms.
-
-    Parameters
-    ----------
-    Pos, Types      : positions and types array
-    rdf_max         : float  – x-axis upper limit (Å)
-    periodic        : bool   – use z-PBC
-    Lims            : list   – system limits (required for PBC)
-    vline           : float or None – reference line position (Å); when None,
-                      use the mean nearest cation–anion distance
-    density         : bool   – normalise to g(r); False = raw counts
-    cation_type     : int    – type id of the cation, default 1
-    anion_type      : int    – type id of the anion,  default 2
-    title           : str    – plot title (auto-generated if None)
-    font_weight     : str    – tick/label font weight
-    title_font_weight : str  – title font weight
-    """
-
-    _require_material(self, "oxide")
-
-    Pos = self.Pos
-    Types = self.Types
-    Lims = self.Lims
-    periodic = self.periodic
-    cation_types, anion_types, _ = _oxide_analysis_types(
-        self, cation_type, anion_type
-    )
-
-    cation_label = _type_labels(self, cation_types)
-    anion_label = _type_labels(self, anion_types)
-
-    if vline is None:
-        vline = _mean_nearest_pair_distance(
-            Pos, Types, cation_types, anion_types,
-            periodic=periodic and len(Lims) > 0, Lims=Lims,
-        )
-
-    Dist_list, _, _ = compute_hist_neighbors(
-        Pos, Types,
-        threshold_type1=threshold_type1, threshold_type2=threshold_type2,
-        periodic=periodic, Lims=Lims, rdf_max=rdf_max,
-        cation_type=cation_types, anion_type=anion_types, hydroxyl_type=(),
-    )
-    Dist_list = [k for j in Dist_list for k in j]
-
-    purple           = _PURPLE
-    dark_purple      = _DARK_PURPLE
-    dark_dark_purple = _DARK_DARK_PURPLE
-
-    fig, ax = plt.subplots()
-    for spine in ax.spines.values():
-        spine.set_linewidth(5)
-
-    counts, edges, patches = ax.hist(
-        Dist_list, bins=100, range=(0, rdf_max),
-        color=purple, edgecolor=dark_purple, linewidth=5,
-    )
-
-    if density:
-        radius = ((np.roll(edges, 1) + edges) / 2)[1:]
-        dr  = radius[1] - radius[0]
-        g_r = counts / (
-            (4 * np.pi * radius**2 * dr)
-            * np.sum(np.isin(Types, cation_types))
-        )
-        for rect, val in zip(patches, g_r):
-            rect.set_height(val)
-        ax.set_ylabel("g(r)", color='black', weight=font_weight, fontsize=20)
-        ax.set_ylim(0, 2)
-    else:
-        ax.set_ylabel("Number", color='black', weight=font_weight, fontsize=20)
-
-    plot_title = title if title else f"RDF {cation_label}–{anion_label}"
-    ax.set_title(plot_title, color='black', weight=title_font_weight, fontsize=20)
-    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=20)
-
-    tick_locs = [k for k in range(int(rdf_max))] + [vline]
-    ax.set_xticks(tick_locs)
-    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=20)
-    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=3,
-               label=f"Bond distance {vline} Å")
-    ax.legend(prop={'size': 15, 'weight': font_weight})
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
-    ax.tick_params(width=5, length=5, color='black')
-    ax.set_xlim(0, rdf_max)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
-    plt.tight_layout()
-    plt.savefig("rdf_oxide.svg")
-    plt.show()
-
-Helix.plot_rdf_cation_anion = plot_rdf_cation_anion
-
-def plot_rdf_metal(self, type_id=None, cube=50, a_theory=4.078, bins=100, rdf_max=4.0,
-                   vline=None,
-                   font_weight='normal', title_font_weight='normal'):
-    """
-    Plot the metal–metal RDF.
-
-    Parameters
-    ----------
-    Pos, Types    : positions and types array
-    type_id       : int   – metal atom type, default 1
-    cube          : float – sub-cube edge (Å), default 50
-    a_theory      : float – FCC lattice parameter (Å), default 4.078 (Au)
-    rdf_max       : float – RDF cutoff (Å), default 4.0
-    periodic      : bool  – apply z-PBC
-    Lims          : list  – system limits (required for PBC)
-    vline         : float or None – reference distance marker (Å); when None,
-                    use the mean nearest metal–metal distance
-    font_weight, title_font_weight : str – matplotlib font weight strings
-    """
-
-
-    _require_material(self, "metal")
-    Pos = self.Pos
-    Types = self.Types
-    Lims = self.Lims
-    periodic = self.periodic
-
-    metal_type_ids = _metal_type_ids(self, type_id)
-    threshold  = rdf_max
-    Pos_metal  = Pos[np.isin(Types, metal_type_ids)]
-    N          = len(Pos_metal)
-    if N == 0:
-        raise ValueError(f"No atoms found for metal type id(s) {metal_type_ids}.")
-    if vline is None:
-        vline = _mean_nearest_pair_distance(
-            Pos, Types, metal_type_ids, metal_type_ids,
-            periodic=periodic and len(Lims) > 0, Lims=Lims,
-            exclude_same_atoms=True,
-        )
-
-    Lx, Ly, Lz = np.max(Pos_metal, axis=0)
-    lx, ly, lz = np.min(Pos_metal, axis=0)
-
-    if periodic:
-        if len(Lims) == 0:
-            print("No limits provided – running as non-periodic.")
-            periodic = False
-        else:
-            lz, Lz = Lims[2]
-
-    Nx = int((Lx - lx) // cube + 1)
-    Ny = int((Ly - ly) // cube + 1)
-    Nz = int((Lz - lz) // cube + 1)
-
-    Pos_added = np.copy(Pos_metal)
-    Idx_added = np.arange(N, dtype=int)
-
-    if periodic:
-        Dz       = Lz - lz
-        mask_top = Pos_metal[:, 2] > (Lz - threshold)
-        mask_bot = Pos_metal[:, 2] < (lz + threshold)
-        Pos_added = np.vstack([
-            Pos_added,
-            Pos_metal[mask_top] - [0, 0, Dz],
-            Pos_metal[mask_bot] + [0, 0, Dz],
-        ])
-        Idx_added = np.concatenate([
-            Idx_added, np.where(mask_top)[0], np.where(mask_bot)[0]
-        ])
-
-    In_orig        = np.zeros(len(Pos_added), dtype=bool)
-    In_orig[:N]    = True
-    Dist_list      = []
-
-    for x in range(Nx):
-        for y in range(Ny):
-            for z in range(Nz):
-                Ind_home = (
-                    (Pos_added[:, 0] >= x*cube + lx) & (Pos_added[:, 0] < (x+1)*cube + lx) &
-                    (Pos_added[:, 1] >= y*cube + ly) & (Pos_added[:, 1] < (y+1)*cube + ly) &
-                    (Pos_added[:, 2] >= z*cube + lz) & (Pos_added[:, 2] < (z+1)*cube + lz)
-                ) & In_orig
-
-                Ind_pad = (
-                    (Pos_added[:, 0] >= x*cube + lx - threshold) & (Pos_added[:, 0] < (x+1)*cube + lx + threshold) &
-                    (Pos_added[:, 1] >= y*cube + ly - threshold) & (Pos_added[:, 1] < (y+1)*cube + ly + threshold) &
-                    (Pos_added[:, 2] >= z*cube + lz - threshold) & (Pos_added[:, 2] < (z+1)*cube + lz + threshold)
-                )
-
-                Pos_home  = Pos_added[Ind_home]
-                Pos_pad   = Pos_added[Ind_pad]
-                Idx_home  = Idx_added[Ind_home]
-                Idx_pad   = Idx_added[Ind_pad]
-
-                if len(Pos_home) < 2:
-                    continue
-
-                D = sd.cdist(Pos_home, Pos_pad)
-                for local_i, gi in enumerate(Idx_home):
-                    mask = (Idx_pad != gi) & (D[local_i] > 0)
-                    Dist_list.append(D[local_i][mask])
-
-    purple           = _PURPLE
-    dark_purple      = _DARK_PURPLE
-    dark_dark_purple = _DARK_DARK_PURPLE
-    Dist_flat        = np.concatenate(Dist_list) if Dist_list else np.array([])
-
-    fig, ax = plt.subplots(figsize=(12, 10))
-    for spine in ax.spines.values():
-        spine.set_linewidth(5)
-
-    counts, edges, patches = ax.hist(
-        Dist_flat, bins=bins, range=(0, rdf_max),
-        color=purple, edgecolor=dark_purple, linewidth=5,
-    )
-    radius = ((np.roll(edges, 1) + edges) / 2)[1:]
-    dr     = radius[1] - radius[0]
-    g_r    = counts / ((4 * np.pi * radius**2 * dr) * N)
-    for rect, val in zip(patches, g_r):
-        rect.set_height(val)
-
-    ax.set_title("RDF Metal–Metal", color='black', weight=title_font_weight, fontsize=20)
-    ax.set_xlabel("Distance (Å)", color='black', weight=font_weight, fontsize=20)
-    ax.set_ylabel("g(r)",         color='black', weight=font_weight, fontsize=20)
-    tick_locs = [k for k in range(int(rdf_max))] + [vline]
-    ax.set_xticks(tick_locs)
-    ax.set_xticklabels(tick_locs, color='black', weight=font_weight, fontsize=20)
-    ax.axvline(vline, color=dark_dark_purple, linestyle='--', linewidth=3,
-               label=f"Bond distance {vline} Å")
-    ax.legend(prop={'size': 25, 'weight': font_weight})
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(nbins=4))
-    ax.tick_params(width=5, length=10, color='black')
-    ax.set_xlim(0, rdf_max)
-    ax.set_ylim(0, 2)
-    plt.setp(ax.get_yticklabels(), color='black', weight=font_weight, fontsize=20)
-    plt.setp(ax.get_xticklabels(), color='black', weight=font_weight, fontsize=20)
-    plt.tight_layout()
-    plt.savefig("rdf_metal.svg")
-
-
-Helix.plot_rdf_metal = plot_rdf_metal
 
 
 # ---------------------------------------------------------------------------
@@ -1435,7 +1114,7 @@ def plot_compute_analysis(self, hist_Dens, hist_Si, hist_O,
     Lims = self.Lims
     periodic = self.periodic
 
-    Dist_list, Cat_count_An, An_count_Cat = compute_hist_neighbors(
+    Dist_list, Cat_count_An, An_count_Cat = compute_rdf(
         Pos, Types,
         threshold_type1=threshold_type1, threshold_type2=threshold_type2,
         threshold_H=threshold_H, periodic=periodic, Lims=Lims, rdf_max=rdf_max,
@@ -1618,7 +1297,7 @@ def save_defects(self, file_name="defects.txt",
     Lims = self.Lims
     periodic = self.periodic
 
-    _, Cat_count_An, An_count_Cat = compute_hist_neighbors(
+    _, Cat_count_An, An_count_Cat = compute_rdf(
         Pos, Types, cube=30, periodic=periodic, Lims=Lims, rdf_max=5,
         cation_type=cation_type, anion_type=anion_type,
     )
@@ -1733,8 +1412,7 @@ def compute_quick_surface(Pos, grid, Lims, alpha=2, prec=20, d=10,
     return cube
 
 
-def plot_analyze_defects(self, Cycles=None, L_cycles=None,
-                    d_spacing=5, isovalue=1., alpha=2., prec=20,
+def plot_defects(self, d_spacing=5, isovalue=1., alpha=2., prec=20,
                     d=10, length_box=20, smoothing=1000, N_th=8,
                     cation_type=1, anion_type=2, metal = False):
     """
@@ -1746,7 +1424,7 @@ def plot_analyze_defects(self, Cycles=None, L_cycles=None,
                     d=10, length_box=20, smoothing=1000, N_th=8,
                     cation_type=1, anion_type=2):
     """
-    print("TO REview")
+
 
     Pos = self.Pos
     Types = self.Types
@@ -1754,7 +1432,7 @@ def plot_analyze_defects(self, Cycles=None, L_cycles=None,
     periodic = self.periodic
 
 
-    _, Cat_count_An, An_count_Cat = compute_hist_neighbors(
+    _, Cat_count_An, An_count_Cat = compute_rdf(
         Pos, Types, cube=30, periodic=periodic, Lims=Lims, rdf_max=5,
         cation_type=cation_type, anion_type=anion_type, metal = metal
     )
@@ -1806,7 +1484,7 @@ def plot_analyze_defects(self, Cycles=None, L_cycles=None,
         plotter.add_mesh(smooth, opacity=0.1, color="red", name="contour")
         plotter.show()
 
-Helix.plot_analyze_defects = plot_analyze_defects
+Helix.plot_defects = plot_defects
 
 def plot_analyze_density(self, d_spacing=5, isovalue=2., alpha=2., prec=20,
                     d=10, length_box=20, smoothing=1000, N_th=8):
@@ -2003,7 +1681,7 @@ def validate_unit_cell(Atom_pos, Atom_types, Lims,
 
 def plot_structure(self, point_size=12, type_colors=None,
                         sphere=True, parallel_proj=True,
-                        draw_bonds=True, max_bond_dist=2.0,do_fancy=True):
+                        draw_bonds=False, max_bond_dist=2.0,do_fancy=False):
     """Render the atomic structure in 3D using PyVista.
 
     Parameters
@@ -2031,6 +1709,12 @@ def plot_structure(self, point_size=12, type_colors=None,
     Types = self.Types
     Lims = self.Lims
     periodic=self.periodic
+
+
+    Pos_cast = self.Pos_cast
+    Types_cast = self.Types_cast
+    is_cast = len(Pos_cast) > 0
+
 
     ##TO ADD CAST PLOTTING
 
@@ -2069,6 +1753,18 @@ def plot_structure(self, point_size=12, type_colors=None,
 
         if do_fancy: plotter.add_mesh(mesh, color=color, pbr=True,roughness=.5,metallic=.2)
         else: plotter.add_mesh(mesh, color=color, lighting=False)
+
+        if is_cast:
+            mask = (Types_cast == type)
+            if not np.any(mask): continue
+            color_cast = [max(color[0]-125,0),max(color[1]-125,0),max(color[2]-125,0)]
+            if sphere:
+                geom = pv.Sphere(radius=radius)
+                mesh = pv.PolyData(Pos_cast[mask].astype(float)).glyph(scale=False, geom=geom, orient=False)
+            else:
+                mesh = pv.PolyData(Pos_cast[mask].astype(float))
+            if do_fancy: plotter.add_mesh(mesh, color=color_cast, pbr=True,roughness=.5,metallic=.2)
+            else: plotter.add_mesh(mesh, color=color_cast, lighting=False)
 
 
 

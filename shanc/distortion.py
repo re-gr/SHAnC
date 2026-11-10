@@ -619,8 +619,6 @@ def create_helix(self,
     if (self.file_lattice.split("."))[-1] == "xyz":
         print("/!\\ Warning, you are trying to create an helix starting from a xyz file. This is not recommended as they don't contain the information of the cubic cell. A box was infered but could be wrong...")
 
-    Lims_visu = [[np.max(Pos_lattice[:,0]), np.min(Pos_lattice[:,0])], [np.max(Pos_lattice[:,1]), np.min(Pos_lattice[:,1])], [np.max(Pos_lattice[:,2]), np.min(Pos_lattice[:,2])]]
-    print("First RDF check on the FCC")
 
     # visualize_cuboid(Pos_lattice, Types_lattice, Lims_visu)
 
@@ -831,8 +829,10 @@ def create_helix(self,
         nH  = np.sum(Types== 4)
         print("Ti:", nTi, "O(2+3):", nO, "H:", nH)
         print("O excess vs 2*Ti:", nO - 2*nTi, " (should equal number of added OH, A)")
-
-        write_data(output_name_cast,Pos_transfo_int,Types_int,Lims_tot,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH, mass_map=mass_map)
+        if len(Pos_transfo_int)!=0:
+            write_data(output_name_cast,Pos_transfo_int,Types_int,Lims_tot,Bonds_OH=Bonds_OH,Angles_OH=Angles_OH, mass_map=mass_map)
+        else:
+            print("The cast is empty, the int_thickness is too large")
 
     ## If we don't add a cast to relax against ##
     else:
@@ -858,7 +858,6 @@ def create_helix(self,
     self.Angles = Angles_OH
     self.Pos_cast = Pos_transfo_int
     self.Types_cast = Types_int
-    self.Lims_cast = Lims_tot
 
 
 Helix.create_helix = create_helix

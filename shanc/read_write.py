@@ -458,7 +458,7 @@ def read_data(file, do_scale=True, atom_style="atom"):
 
             # --- masses section: "type_id  mass  [# comment]" ---
             if in_masses:
-                print(lsplit[1])
+                # print(lsplit[1])
                 try:
                     mass_map[int(lsplit[0])] = float(lsplit[1])
                 except (ValueError, IndexError):
@@ -1002,5 +1002,5 @@ def create_helix_from_file(file, do_scale=True,  atom_style="atom"):
     helix_created = helix()
     Atom_pos, Atom_types, Lims, mass_map, type_map = helix_created.read_structure(file,do_scale=do_scale,atom_style=atom_style)
 
-    helix_created.set_atoms(self,Atom_pos,Atom_types,Lims,[],[],type_map,mass_map)
+    helix_created.set_atoms(Atom_pos,Atom_types,Lims,[],[],type_map,mass_map)
     return helix_created
