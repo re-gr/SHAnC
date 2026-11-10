@@ -22,9 +22,7 @@ from shanc.read_write import *
 import matplotlib.pyplot as plt
 import pyvista as pv
 from shanc.helix_object import *
-from scipy.spatial import KDTree
-import matplotlib.ticker as ticker
-from scipy.spatial import cKDTree
+
 
 # Colours extracted from Jmol
 # https://jmol.sourceforge.net/jscolors/
