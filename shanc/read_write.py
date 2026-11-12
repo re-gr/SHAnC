@@ -489,6 +489,9 @@ def read_data(file, do_scale=True, atom_style="atom"):
                 continue
 
         Atom_pos = np.array(Atom_pos, dtype=float)
+        if np.sum(Atom_pos <= 1) > len(Atom_pos):
+            #We are in the case where the position are relative to the box, thus one should rescale the positions
+            Atom_pos = Atom_pos * np.array([(Lims[0][1]-Lims[0][0]),(Lims[1][1]-Lims[1][0]),(Lims[2][1]-Lims[2][0])])
 
         # --- infer box from positions if not found in file ---
         if len(Lims) < 3:
@@ -978,7 +981,7 @@ def read_structure_from_file(file, do_scale=True, atom_style="full"):
         list_TSTEP, list_NUM_AT, list_BOX, list_ATOMS = read_dump(file, unscale=do_scale)
         Lims = list_BOX[-1]
         Atoms_last_step = list_ATOMS[-1]
-        Atom_types = Atoms_last_step[:,1]
+        Atom_types = Atoms_last_step[:,1].astype("int")
         Atom_pos = Atoms_last_step[:,2:]
         print("System extracted from a dump file, no symbol mapping are done. If one wants it to be done, one should load a data file or set it manually.")
         mass_map = {}

@@ -122,7 +122,8 @@ class Helix:
 
         self.file_lattice = file_lattice
 
-
+        self.Bonds_analysis = []
+        self.Coordination = []
         self.rdf = []
 
         if file_lattice != "":
