@@ -37,7 +37,7 @@ The color of each atom will by default be an association made with the atomic nu
 If there is a cast in the helix, it will also be plotted.
 It will produce the following result.::
 
-    helix.plot_structure()
+    helix.plot_structure(draw_bonds=True)
 
 .. pyvista-plot::
     :include-source: false
@@ -52,26 +52,10 @@ It will produce the following result.::
     helix = shanc.Helix(file_lattice=file_lattice)
     helix.read_structure(file_last_timestep)
 
-    helix.plot_structure()
+    helix.plot_structure(draw_bonds=True)
 
-::
-
-    helix.plot_structure(draw_bonds = True, do_fancy = True)
-
-.. pyvista-plot::
-    :include-source: false
-
-    import shanc
-    import shanc.examples
-
-    file_lattice = shanc.examples.SiO2_helix
-    file_last_timestep = shanc.examples.SiO2_last_timestep
-
-    helix = shanc.Helix(file_lattice=file_lattice)
-    helix.read_structure(file_last_timestep)
-    helix.plot_structure(do_fancy=True,draw_bonds=True)
-
-One has to remark that computing the bonds for the whole system and doing a "fancier" plot can take a bit longer to plot.
+I would personally recommend using the :doc:`do_fancy<../api/methods/plot_structure>` keyword as it provides a prettier result at a small computational cost. However due to Github limitations it cannot be plotted on this wiki...
+One has to remark that computing the bonds for the whole system can be much longer to plot.
 Also, due to the periodicity, some bonds crosses the whole system. One can remove this behaviour by using the :doc:`Helix.set_periodic<../api/methods/set_periodic>` method.
 
 
