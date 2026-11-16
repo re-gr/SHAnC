@@ -35,3 +35,33 @@ from shanc.add_chromophore import *
 # - defaultdict: convenient dictionary defaults for counters and maps
 
 __version__ = "0.0.1.2"
+
+
+nprocs = 4
+
+def set_number_procs(nprocs):
+    """
+    set_number_procs
+
+    This function sets the number of processor that will be used.
+    Due to python shenanigans, one should use at most 8.
+    Higher number of processors will unfortunately usually slow down calculations
+    In my experience, between 4 and 8 processors no real differences arise.
+
+
+    Parameters
+    ----------
+        nprocs : int
+            the maximum number of processors
+
+    Returns
+    -------
+        None
+    """
+
+    if type(nprocs) is int:
+        shanc.nprocs = nprocs
+    else:
+        raise TypeError('The number of processors used should be an integer. You gave a {}'.format(type(nprocs)))
+
+set_nprocs = set_number_procs

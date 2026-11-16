@@ -134,6 +134,10 @@ class Helix:
                 self.Lims_lattice = Lims
                 self.type_map = type_map
                 self.mass_map = mass_map
+                if not "O" in type_map.values():
+                    print("No oxygens detected in the system, will not try to saturate the system with H2O")
+                    self.saturation = False
+
 
             except:
                 print("Tried reading the lattice file but an unknown issue happened.")

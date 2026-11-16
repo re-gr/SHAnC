@@ -964,6 +964,7 @@ def read_structure_from_file(file, do_scale=True, atom_style="full"):
 
     """
     format = file.split(".")[-1]
+
     if format == "data":
         Lims, Atom_types, Atom_pos, mass_map = read_data(file, do_scale=do_scale, atom_style=atom_style)
         type_map = _mass_to_symbol_map(mass_map)

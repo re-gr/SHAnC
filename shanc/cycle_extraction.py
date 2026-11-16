@@ -5,9 +5,9 @@ This module provides tools to detect Si–O ring cycles from bond graphs,
 clean redundant cycles, save / read cycle descriptions, and visualize
 cycle populations and 3D cycle geometries.
 """
-import os, sys
+
+
 import networkx as nx
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from shanc.analysis import *
 

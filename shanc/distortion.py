@@ -7,9 +7,8 @@ for simulation. The functions are specialized for oxide/metal structures and
 maintain bond and angle connectivity for OH-passivated surfaces.
 
 """
-import os, sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import shanc
 import numpy as np
 import scipy.spatial.distance as sd
 
@@ -596,6 +595,8 @@ def create_helix(self,
     twist = self.twist
     saturation = self.saturation
     periodic = self.periodic
+
+    print(self.type_map)
 
     if mass_map == {}:
         mass_map = self.mass_map
