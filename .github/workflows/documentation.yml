@@ -15,7 +15,7 @@ jobs:
           pip install sphinx sphinx_rtd_theme myst_parser pyvista numpy scipy sphinx_design sphinx-copybutton trame-vtk 'pyvista[jupyter]' sphinxcontrib.asciinema pydata-sphinx-theme shanc matplotlib
       - name: Sphinx build
         run: |
-          sphinx-build doc _build
+          sphinx-build doc _build -E
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
