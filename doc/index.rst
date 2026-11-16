@@ -27,3 +27,13 @@ Here one can find all the functions and methods that can be used in SHAnC.
     :maxdepth: 2
 
     shanc_api
+
+#Datasets
+#--------
+#
+#The datasets used by SHAnC can be found here.
+#
+#.. toctree::
+#    :maxdepth: 4
+#
+#    datasets

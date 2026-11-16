@@ -10,7 +10,9 @@ Getting Started
 * :doc:`Format of files<tuto/formats>`
 * :doc:`Construction of helices<tuto/construction>`
 * :doc:`MD : LAMMPS<tuto/lammps>`
-* :doc:`Analysis of helices<tuto/analysis>`
+* :doc:`Chemical analysis of helices<tuto/chemical_analysis>`
+* :doc:`Structural analysis of helices<tuto/structural_analysis>`
+* :doc:`Multithreading<tuto/multithreading>`
 * :doc:`Template of files<tuto/file_examples>`
 
 .. toctree::
@@ -21,5 +23,7 @@ Getting Started
   tuto/formats
   tuto/construction
   tuto/lammps
-  tuto/analysis
+  tuto/chemical_analysis
+  tuto/structural_analysis
+  tuto/multithreading
   tuto/file_examples
