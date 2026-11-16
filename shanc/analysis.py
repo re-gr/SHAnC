@@ -1340,16 +1340,42 @@ def _compute_density(Pos_points_surface, Pos, periodic=False, Lims = [], length_
     return Density
 
 
-def plot_density(self,d=5,prec=10,length_box=20,d_spacing_init=3,isovalue_init=1,alpha_init=2.,smoothing_init=3000,d_max_init=5,plot_atoms=True):
-
+def plot_density(self,length_box=30,prec=10,d=5,d_spacing_init=3,alpha_init=2.,isovalue_init=1,smoothing_init=3000,d_max_init=5,plot_atoms=True):
     """
-    analyze_defects(Pos,Types,periodic=False,Lims=[],Cycles=None,L_cycles=None)
+    plot_density(length_box=30,prec=10,d=5,d_spacing_init=3,alpha_init=2.,isovalue_init=1,smoothing_init=3000,d_max_init=5,plot_atoms=True)
 
+    This function plots the surface and the density around each point of the surface.
+    For more information on surface reconstruction see the wiki.
 
+    Parameters
+    ----------
+        length_box : float, optional
+            the length of the box by which to divide the system. 30 by default
+        prec : float, optional
+            the distance by which to include gaussian function of atoms for the reconstruction. 10 by default
+        d : float, optional
+            the distance by which to enlarge the initial box to create the rectilinear grid. 5 by default
+        d_spacing_init : float,optional
+            the initial d_spacing of the rectilinear grid. 3 by default
+        alpha_init : float, optional
+            the initial alpha value. 2 by default
+        isovalue_init : float, optional
+            the initial value for the isovalue, 1 by default
+        smoothing_init : float, optional
+            the initial value for the number of pass of the smoothing. Here it is big to have a cleaner helix. 3000 by default
+        d_max_init : float, optional
+            the initial value of the distance that is used to count the number of atoms to get the density of the surface. 5 by default
+        plot_atoms : bool, optional
+            whether to plot the atoms or not. True by default
+
+    Return
+    ------
+        None
+            The plot is made
     """
 
     #########MIGHT BE POSSIBLE TO USE RECOMPUTED PARAMETERS TO GET THIS HELIX
-    #
+    #Need to look into it
     N_th = shanc.nprocs
 
     Pos = self.Pos
@@ -1488,9 +1514,36 @@ def _blur_colors(Pos_points_surface, colors, periodic=False, Lims = [], length_b
 
 
 
-def plot_curvature(self,prec=5,d=5,length_box=30,d_spacing_init=3,isovalue_init=1,alpha_init=2.,smoothing_init=200,plot_atoms=True):
+def plot_curvature(self,length_box=30,prec=5,d=5,d_spacing_init=3,alpha_init=2.,isovalue_init=1,smoothing_init=500,plot_atoms=True):
     """
-    Putting prec too low and/or length box too high might result in an apparition of "cubes" in the shape
+    plot_curvature(length_box=30,prec=5,d=5,d_spacing_init=3,alpha_init=2.,isovalue_init=1,smoothing_init=500,plot_atoms=True)
+
+    This function plots the surface and computes the curvature on the surface.
+    For more information on surface reconstruction see the wiki.
+
+    Parameters
+    ----------
+        length_box : float, optional
+            the length of the box by which to divide the system. 30 by default
+        prec : float, optional
+            the distance by which to include gaussian function of atoms for the reconstruction. 10 by default
+        d : float, optional
+            the distance by which to enlarge the initial box to create the rectilinear grid. 5 by default
+        d_spacing_init : float,optional
+            the initial d_spacing of the rectilinear grid. 3 by default
+        alpha_init : float, optional
+            the initial alpha value. 2 by default
+        isovalue_init : float, optional
+            the initial value for the isovalue, 1 by default
+        smoothing_init : float, optional
+            the initial value for the number of pass of the smoothing. 500 by default
+        plot_atoms : bool, optional
+            whether to plot the atoms or not. True by default
+
+    Return
+    ------
+        None
+            The plot is made
 
     """
     Pos = self.Pos
