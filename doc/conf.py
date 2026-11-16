@@ -8,18 +8,19 @@
 
 import os
 import sys
-
-sys.path.insert(0,os.path.abspath(os.path.join("..")))
 sys.setrecursionlimit(1500)
 
 import pyvista
 from pyvista.plotting.utilities.sphinx_gallery import DynamicScraper
+
 pyvista.BUILDING_GALLERY = True
 pyvista.set_plot_theme("document")
 pyvista.set_error_output_file("errors.txt")
 
 
 os.environ["PYVISTA_BUILDING_GALLERY"] = "true"
+
+from matplotlib.sphinxext import *
 
 
 project = 'SHAnC'
@@ -42,13 +43,20 @@ extensions = [
     "pyvista.ext.viewer_directive",
     "sphinx_design",
     "sphinxcontrib.asciinema",
-    ]
+    'matplotlib.sphinxext.plot_directive',]
+
+
+
+
+
 napoleon_custom_sections = [('Returns', 'params_style'), ("Attributes","params_style")]
 
 templates_path = ['_templates']
 exclude_patterns = []
 
-
+plot_html_show_source_link = False
+plot_html_show_formats = False
+plot_include_source = True
 
 html_theme = 'pydata_sphinx_theme'
 
