@@ -21,7 +21,7 @@ SHAnC uses object oriented programming, and as such, the "helix" objects are def
 
 One can simply create an helix using the following command::
 
-    helix = shanc.helix()
+    helix = shanc.Helix()
 
 This helix is empty and contains no information. So as an example we will create a silica helix with the following parameters :
 
@@ -43,7 +43,7 @@ In order to do that, one can use the following script::
     diameter = 60.
     turns = 1
 
-    helix = shanc.helix(pitch=pitch,width=width,thickness=thickness,diameter=diameter,turns=turns,file_lattice=file_lattice)
+    helix = shanc.Helix(pitch=pitch,width=width,thickness=thickness,diameter=diameter,turns=turns,file_lattice=file_lattice)
 
 Helix Creation and Visualisation
 --------------------------------
