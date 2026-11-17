@@ -6,82 +6,87 @@ Helix object definition for SHAnC
 from shanc.read_write import *
 
 
-_METAL_ELEMENTS = frozenset(
-    "Li Be Na Mg Al K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd "
-    "Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi "
-    "Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv".split()
-)
-
 
 class Helix:
     """
-    Helix object
+    Helix(pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = "")
+
+    Constructs the helix object containing the atoms and the casts.
+    If one provides the "file_lattice", the lattice will be directly loaded.
+
+    Attributes
+    ----------
+        pitch : float
+            the pitch, or the period of the helix
+        width : float
+            the width of the helix
+        thickness : float
+            the thickness of the helix
+        diameter : float
+            the diameter of the circle containing the helix.
+        turns : float
+            the amount of turns made by the helix
+        Pos : list
+            The position of the atoms
+        Types : list
+            The types of the atoms
+        Lims : list
+            The limit coordinates of the system
+        Bonds : list
+            The list of the bonds typically used for analysis
+        Angles : list
+            The angles of the OH bonds used to complete the system
+        type_map : dict
+            the mapping of the type of atom used by LAMMPS and the atomic name
+        mass_map : dict
+            the mapping of the type of atom used by LAMMPS and the atomic mass
+        bonds_mapping : dict
+            the mapping of the number of bonds a type of atom should have
+        threshold_map : dict
+            the mapping for the threshold used to compute bonds
+        cast : bool
+            If a cast is present or not.
+        int_thick : float
+            The thickness of the outside layer
+        Pos_cast : list
+            The position of the atoms of the cast
+        Types_cast : list
+            The type of the atoms of the cast
+        Pos_lattice : list
+            The position of the atoms for the lattice
+        Types_lattice : list
+            The types of the atoms for the lattice
+        Lims_lattice : list
+            The limit coordinates for the lattice
+        twist : bool
+            If the helix is a twisted ribbon or not
+        saturation : bool
+            If the helix has to be saturated or not
+        periodic : bool
+            If the system should be treated as periodic or not
+        file_lattice : str
+            The name of the file containing the lattice.
+        Bonds_analysis : list
+            The array containing the bonds computed by SHAnC
+        Coordination : list
+            The array containing the coordination distribution
+        rdf : list
+            The array containing the RDF of every type with the others
+
+    Parameters
+    ----------
+        None
+            This is just an initialisation
+
+    Returns
+    -------
+        helix : helix
+            The Helix object.
     """
 
     def __init__(self, pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = ""):
         """
-        Helix(pitch = 0., width = 0., thickness = 0., diameter = 0., turns = 1, file_lattice = "")
-
-        Constructs the helix object containing the atoms and the casts.
-        If one provides the "file_lattice", the lattice will be directly loaded.
-
-
-        Attributes
-        ----------
-            pitch : float
-                the pitch, or the period of the helix
-            width : float
-                the width of the helix
-            thickness : float
-                the thickness of the helix
-            diameter : float
-                the diameter of the circle containing the helix.
-            turns : float
-                the amount of turns made by the helix
-            Pos : list
-                The position of the atoms
-            Types : list
-                The types of the atoms
-            Lims : list
-                The limit coordinates of the system
-            Bonds : list
-                The list of the bonds typically used for analysis
-            Angles : list
-                The angles of the OH bonds used to complete the system
-            type_map : dict
-                the mapping of the type of atom used by LAMMPS and the atomic name
-            mass_map : dict
-                the mapping of the type of atom used by LAMMPS and the atomic mass
-            cast : bool
-                If a cast is present or not.
-            Pos_cast : list
-                The position of the atoms of the cast
-            Types_cast : list
-                The type of the atoms of the cast
-            Pos_lattice : list
-                The position of the atoms for the lattice
-            Types_lattice : list
-                The types of the atoms for the lattice
-            Lims_lattice : list
-                The limit coordinates for the lattice
-            twist : bool
-                If the helix is a twisted ribbon or not
-            saturation : bool
-                If the helix has to be saturated or not
-            periodic : bool
-                If the system should be treated as periodic or not
-            file_lattice : str
-                The name of the file containing the lattice.
-
-        Parameters
-        ----------
-            None
-                This is just an initialisation
-
-        Returns
-        -------
-            helix : helix
-                The Helix object.
+        Initialisation function
         """
 
         self.pitch = pitch
@@ -141,55 +146,6 @@ class Helix:
 
             except:
                 print("Tried reading the lattice file but an unknown issue happened.")
-
-
-    @property
-    def metal(self):
-        """LAMMPS type ids mapped to metallic elements."""
-        return tuple(
-            type_id for type_id, symbol in self.type_map.items()
-            if isinstance(symbol, str) and symbol.capitalize() in _METAL_ELEMENTS
-        )
-
-    @property
-    def oxide_anion_types(self):
-        """Type ids mapped to oxygen."""
-        return tuple(
-            type_id for type_id, symbol in self.type_map.items()
-            if isinstance(symbol, str) and symbol.capitalize() == "O"
-        )
-
-
-    @property
-    def oxide_cation_types(self):
-        """Type ids mapped to non-oxygen, non-hydrogen oxide species."""
-        return tuple(
-            type_id for type_id, symbol in self.type_map.items()
-            if isinstance(symbol, str)
-            and symbol.capitalize() not in {"O", "H"}
-        )
-
-    @property
-    def hydrogen_types(self):
-        """Type ids mapped to hydrogen."""
-        return tuple(
-            type_id for type_id, symbol in self.type_map.items()
-            if isinstance(symbol, str) and symbol.capitalize() == "H"
-        )
-
-    @property
-    def material(self):
-        """Infer whether the atom type map describes an oxide, metal, or other system."""
-        if self.oxide_anion_types:
-            return "oxide"
-        symbols = {
-            str(symbol).capitalize()
-            for symbol in self.type_map.values()
-            if isinstance(symbol, str)
-        }
-        if symbols and symbols <= _METAL_ELEMENTS:
-            return "metal"
-        return "unknown"
 
 
     def set_parameters(self, pitch, width, thickness, diameter, turns):
@@ -410,6 +366,40 @@ class Helix:
             self.mass_map = mass_map
 
 
+    def set_type_map(self,type_map):
+        """
+        set_type_map(type_map)
+
+        Sets the mapping for the type and atomic symbol
+
+        Parameters
+        ----------
+            type_map : dict
+                the type mapping
+
+        Returns
+        -------
+            None
+        """
+        self.type_map = type_map
+
+    def set_mass_map(self,mass_map):
+        """
+        set_mass_map(mass_map)
+
+        Sets the mapping for the mass of each type
+
+        Parameters
+        ----------
+            mass_map : dict
+                the mass mapping
+
+        Returns
+        -------
+            None
+        """
+        self.mass_map = mass_map
+
     def set_bonds_mapping(self,bonds_mapping):
         """
         set_bonds_mapping(bonds_mapping)
@@ -429,25 +419,43 @@ class Helix:
         """
         self.bonds_mapping = bonds_mapping
 
-
-    def create_helix_from_file(file, do_scale=True, atom_style="atom", type_map = None, mass_map = None):
+    def set_threshold_map(self,threshold_map):
         """
-        read_structure_from_data(file, do_scale=True, atom_style="full")
+        set_threshold_map(threshold_map)
 
-        This function tries to read a structure file from a file.
-        The format of the file should be .data, .xyz or .lmmpstrj
+        Sets the mapping for the threshold map.
+        The threshold is used to compute the bonds of the system and should be assigned for every type
 
-        SHould be used to display after dynamics
+        Parameters
+        ----------
+            threshold_map : dict
+                the threshold_map mapping
 
+        Returns
+        -------
+            None
         """
+        self.threshold_map = threshold_map
 
-        Atom_pos, Atom_types, Lims, parsed_mass_map, parsed_type_map = read_structure_from_file(file, do_scale=do_scale, atom_style=atom_style)
 
-        helix_created = Helix()
+def create_helix_from_file(file, do_scale=True, atom_style="atom", type_map = None, mass_map = None):
+    """
+    read_structure_from_data(file, do_scale=True, atom_style="full")
 
-        resolved_type_map = parsed_type_map if type_map is None else type_map
-        resolved_mass_map = parsed_mass_map if mass_map is None else mass_map
+    This function tries to read a structure file from a file.
+    The format of the file should be .data, .xyz or .lmmpstrj
 
-        helix_created.set_atoms(Atom_pos,Atom_types,Lims,[],[], type_map=resolved_type_map, mass_map=resolved_mass_map)
+    SHould be used to display after dynamics
 
-        return helix_created
+    """
+
+    Atom_pos, Atom_types, Lims, parsed_mass_map, parsed_type_map = read_structure_from_file(file, do_scale=do_scale, atom_style=atom_style)
+
+    helix_created = Helix()
+
+    resolved_type_map = parsed_type_map if type_map is None else type_map
+    resolved_mass_map = parsed_mass_map if mass_map is None else mass_map
+
+    helix_created.set_atoms(Atom_pos,Atom_types,Lims,[],[], type_map=resolved_type_map, mass_map=resolved_mass_map)
+
+    return helix_created

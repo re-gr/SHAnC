@@ -25,9 +25,9 @@ from shanc.helix_object import *
 # Duplication of the lattice
 # ---------------------------------------------------------------------------
 
-def duplicate(Nx_list,Ny_list,Nz,Lims,Atom_type,Atom_pos,Bonds_OH=[],Angles_OH=[]):
+def _duplicate(Nx_list,Ny_list,Nz,Lims,Atom_type,Atom_pos,Bonds_OH=[],Angles_OH=[]):
     """
-    duplicate(Nx_list,Ny_list,Nz,Lims,Atom_type,Atom_pos,clean=False,Bonds_OH=[],Angles_OH=[])
+    _duplicate(Nx_list,Ny_list,Nz,Lims,Atom_type,Atom_pos,clean=False,Bonds_OH=[],Angles_OH=[])
 
     Duplicates a system multiple times.
     Nx_list and Ny_list can be a list or an int.
@@ -234,7 +234,7 @@ def _clean_structure(Pos, Types, Lims, N, periodic=True,
     """
 
     auto = _auto_cap_params(Pos, Types, Lims, cation_type, anion_type, cap_missing = cap_missing)
-    print("cap missing:", cap_missing)
+    # print("cap missing:", cap_missing)
     expected_coord = auto["expected_coord"] if expected_coord is None else expected_coord
     bond_threshold = auto["bond_threshold"] if bond_threshold is None else bond_threshold
     bond_length    = auto["bond_length"]    if bond_length    is None else bond_length
@@ -275,12 +275,12 @@ def _clean_structure(Pos, Types, Lims, N, periodic=True,
     Lack_Cat = Pos_Cat[Lack_Cat_mask]
     Lack_Cat_D_rows = D_all[Lack_Cat_mask]
 
-    print(f"bond_threshold={bond_threshold} angstrom, "
-    f"expected_coord={expected_coord}, collision_tol={collision_tol} angstrom")
-    print(f" bond count distribution: "
-    f"{dict(zip(*np.unique(Cat_count_An, return_counts=True)))}")
-    print(f" minimum bond count = {min_count} "
-    f"{len(Lack_Cat)} surface cation(s) to cap")
+    # print(f"bond_threshold={bond_threshold} angstrom, "
+    # f"expected_coord={expected_coord}, collision_tol={collision_tol} angstrom")
+    # print(f" bond count distribution: "
+    # f"{dict(zip(*np.unique(Cat_count_An, return_counts=True)))}")
+    # print(f" minimum bond count = {min_count} "
+    # f"{len(Lack_Cat)} surface cation(s) to cap")
 
     Atoms_add_pos = []
     Atoms_add_types = []
@@ -377,14 +377,14 @@ def _clean_structure(Pos, Types, Lims, N, periodic=True,
 
     n_caps_total = len(Lack_Cat)
     n_partner_unique = len(set(partner_idx))        # append idx_cap to partner_idx inside the loop
-    print("caps:", n_caps_total, "unique partner O:", n_partner_unique)
+    # print("caps:", n_caps_total, "unique partner O:", n_partner_unique)
 
     mid_types = New_Types
     nTi = np.sum(mid_types == cation_type)
     nO  = np.sum((mid_types == anion_type) | (mid_types == 3))
     nH  = np.sum(mid_types == 4)
-    print("Ti:", nTi, "O(2+3):", nO, "H:", nH)
-    print("O excess vs 2*Ti:", nO - 2*nTi, " (should equal number of added OH, A)")
+    # print("Ti:", nTi, "O(2+3):", nO, "H:", nH)
+    # print("O excess vs 2*Ti:", nO - 2*nTi, " (should equal number of added OH, A)")
 
     New_Pos = New_Pos[Middle]
     New_Pos = New_Pos - np.array([0, 0, np.min(New_Pos[:, 2])])
@@ -462,7 +462,6 @@ def _geometric_transformation(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10,
     mean = np.mean(Pos,axis=0)
     mean[2] = np.min(Pos[:,2])
     Pos = Pos - mean
-    print("visualize realign the center")
 
     x,y,z = Pos.transpose()
     Lx = np.max(x)
@@ -537,49 +536,34 @@ def _geometric_transformation(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10,
 # System generation
 # ---------------------------------------------------------------------------
 
-def create_helix(self,
-                file_lattice="", output_name = "helix.data",
-                output_name_cast = "helix_cast.data", mass_map = {},  cap_missing=2):
-
+def create_helix(self,file_lattice="",output_name="helix.data",output_name_cast="helix_cast.data",cap_missing=2):
     """
-    create_syst(rota,D,pitch,width,thickness,int_thick,_clean_structure=True,periodic=True,circling=True,do_rota_transf=False,file_lattice="beta_quartz.data",do_angles=False)
+    create_helix(file_lattice="", output_name = "helix.data",output_name_cast = "helix_cast.data")
 
     This functions creates the whole system using the dimensions stated.
-    It creates two files : by default quartz_dupl.data and quartz_int.data which contains the data of the surface and the data of the cast respectively.
+    It creates two files : by default helix.data and helix_cast.data which contains the data of the surface and the data of the cast respectively.
 
     Parameters
     ----------
-        rota : float
-            the amount of turns made by the helix
-        diameter : float
-            the diameter of the circle containing the helix.
-        pitch : float
-            the pitch, or the period of the helix
-        width : float
-            the width of the helix
-        thickness : float
-            the thickness of the helix
-        _clean_structure : bool, optional
-            To clean or not the structure by adding H2O. By default True
-        periodic : bool, optional
-            do the creation of a periodic system after the transformation
-        circling : bool, optional
-            Circle the basis of the cuboid. This should be used to create helices as is gives much better curvatures. By default True
-        do_rota_transf : bool, optional,
-            Use the rota transformation instead of the helix one. This should not be used as it gives much worse structure. By default False
-        file_lattice : float, optional,
-            the file containing the lattice that will be duplicated
-        do_angles : bool, optional
-            write the angles SiOH
+        file_lattice : str, optional
+            the file containing the lattice that will be duplicated. By default the one loaded in the Helix will be used.
+        output_name : str, optional
+            the name of the output file containing the surface. "helix.data" by default
+        output_name_cast : str, optional
+            the name of the output file containing the cast. "helix_cast.data" by default
 
     Returns
     -------
         Helix : helix
             helix object that contains the information of the system
 
-        Two files are also created : quartz_dupl.data and quartz_int.data by default
+        Two files are also created : helix.data and helix_cast.data by default
     """
-
+    #########
+    # NEED TO LOOK INTO LOTS OF THINGS HERE
+    # most notably the cap_missing
+    #########
+    #
     #the asymetric factor for the cast inside, maybe we should look into this
     asym = 1
 
@@ -596,14 +580,11 @@ def create_helix(self,
     saturation = self.saturation
     periodic = self.periodic
 
-    print(self.type_map)
 
+
+    mass_map = self.mass_map
     if mass_map == {}:
-        mass_map = self.mass_map
-        if mass_map == {}:
-            raise SyntaxError("Missing mass_map, try adding it when defining your helix, or put it as an argument of this function.")
-    else:
-        self.mass_map = mass_map
+        raise SyntaxError("Missing mass_map, try adding it when defining your helix, or put it as an argument of this function.")
 
 
     if file_lattice != "":
@@ -612,10 +593,11 @@ def create_helix(self,
     Pos_lattice = self.Pos_lattice
     Types_lattice = self.Types_lattice
     Lims_lattice = self.Lims_lattice
-    material = self.material
 
-    if material == "metal":
-        saturation = False
+    # material = self.material
+
+    # if material == "metal":
+    #     saturation = False
 
     if (self.file_lattice.split("."))[-1] == "xyz":
         print("/!\\ Warning, you are trying to create an helix starting from a xyz file. This is not recommended as they don't contain the information of the cubic cell. A box was infered but could be wrong...")
@@ -716,7 +698,7 @@ def create_helix(self,
         ## For oxydes --> need to "clean" the structure with OH bonds
         # Create one slab that is corrected then duplicated Nz times
         # The slab contains 3 duplicates as to only take the inside when doing the cleaning
-        Pos, Types, Lims_tot, _a, _b = duplicate(Nx,Ny,3,Lims_lattice,Types_lattice,Pos_lattice)
+        Pos, Types, Lims_tot, _a, _b = _duplicate(Nx,Ny,3,Lims_lattice,Types_lattice,Pos_lattice)
         # visualize_cuboid(Pos, Types)
         Pos, Types, Bonds_OH, _ = _clean_structure(Pos, Types, Lims_lattice, N_list, periodic=True, cap_missing=cap_missing)
 
@@ -733,7 +715,7 @@ def create_helix(self,
 
 
         # visualize_cuboid(Pos, Types)
-        Pos, Types, Lims_tot, Bonds_OH, _ = duplicate(1,1,Nz,Lims_lattice,Types,Pos,Bonds_OH=Bonds_OH)
+        Pos, Types, Lims_tot, Bonds_OH, _ = _duplicate(1,1,Nz,Lims_lattice,Types,Pos,Bonds_OH=Bonds_OH)
 
         # Adapt the pitch to the new z dimension to avoid problems with the periodicity of the system after the transformation
         # ############
@@ -754,7 +736,7 @@ def create_helix(self,
 
     else:
         ## Create slab form which we remove the duplicate atoms ##
-        Pos, Types, Lims_tot, _a, _b = duplicate(Nx, Ny, Nz,Lims_lattice,Types_lattice,Pos_lattice)
+        Pos, Types, Lims_tot, _a, _b = _duplicate(Nx, Ny, Nz,Lims_lattice,Types_lattice,Pos_lattice)
 
         Bonds_OH, Angles_OH = [], []
         Lims_visu = [[0,Nx*lx], [0, Ny*ly], [0, Nz*lz]]

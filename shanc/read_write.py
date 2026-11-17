@@ -1003,7 +1003,7 @@ def create_helix_from_file(file, do_scale=True,  atom_style="atom"):
 
     """
 
-    helix_created = helix()
+    helix_created = Helix()
     Atom_pos, Atom_types, Lims, mass_map, type_map = helix_created.read_structure(file,do_scale=do_scale,atom_style=atom_style)
 
     helix_created.set_atoms(Atom_pos,Atom_types,Lims,[],[],type_map,mass_map)
