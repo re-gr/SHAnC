@@ -1,8 +1,30 @@
 SHAnC API
 =========
 
+Helix object
+------------
+
 
 .. toctree::
-    :maxdepth: 4
 
-    api/helix_methods
+    api/helix
+
+
+
+Helix construction
+------------------
+
+.. toctree::
+
+    api/helix_construction
+
+Helix analysis
+--------------
+
+.. toctree::
+
+    api/helix_analysis
+
+
+Read write files
+----------------

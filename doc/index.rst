@@ -14,7 +14,6 @@ Tutorials
 A detailed tutorial on how to build and analyse the helices can be found here.
 
 .. toctree::
-   :maxdepth: 4
 
    tutorials
 
@@ -24,16 +23,5 @@ SHAnC API
 Here one can find all the functions and methods that can be used in SHAnC.
 
 .. toctree::
-    :maxdepth: 2
 
     shanc_api
-
-#Datasets
-#--------
-#
-#The datasets used by SHAnC can be found here.
-#
-#.. toctree::
-#    :maxdepth: 4
-#
-#    datasets

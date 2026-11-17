@@ -7,6 +7,7 @@ The recommended format for this is the data format from `LAMMPS <https://docs.la
 
 Before the construction of the helix, one should load and visualize the lattice by using the :doc:`Helix.plot_structure<../api/methods/plot_structure>` method.
 
+**Be careful that the lattice should be orthorombic.**
 
 Dimensions
 ----------
