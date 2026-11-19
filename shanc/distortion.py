@@ -536,7 +536,7 @@ def _geometric_transformation(Pos,Types,Lims, mean = None,D=0,rota=0,enlarge=10,
 # System generation
 # ---------------------------------------------------------------------------
 
-def create_helix(self,file_lattice="",output_name="helix.data",output_name_cast="helix_cast.data",cap_missing=2):
+def create_helix(self,file_lattice="",output_name="helix.data",output_name_cast="helix_cast.data",cap_missing=2, hand="right"):
     """
     create_helix(file_lattice="", output_name = "helix.data",output_name_cast = "helix_cast.data")
 
@@ -606,6 +606,9 @@ def create_helix(self,file_lattice="",output_name="helix.data",output_name_cast=
     # visualize_cuboid(Pos_lattice, Types_lattice, Lims_visu)
 
     # Get the number of duplication needed to get the proper dimensions
+    if hand not in ("right", "left"):
+        raise ValueError("Invalid hand value. Must be 'right' or 'left'.")
+    
     lx = Lims_lattice[0][1] - Lims_lattice[0][0]
     ly = Lims_lattice[1][1] - Lims_lattice[1][0]
     lz = Lims_lattice[2][1] - Lims_lattice[2][0]
@@ -724,9 +727,9 @@ def create_helix(self,file_lattice="",output_name="helix.data",output_name_cast=
         ## It should come from the enlarge_z which was specific to the silica, it should be corrected now
         # ###########
 
-        # pitch_actual = Nz*lz
-        # Pos[:,2] *= pitch/pitch_actual
-        # Lims_tot[2] *= pitch/pitch_actual
+        pitch_actual = Nz*lz
+        Pos[:,2] *= pitch/pitch_actual
+        Lims_tot[2] *= pitch/pitch_actual
 
         # visualize_cuboid(Pos, Types, Lims_visu)
         # plot_rdf_type1type2(Pos, Types)
@@ -760,6 +763,10 @@ def create_helix(self,file_lattice="",output_name="helix.data",output_name_cast=
         enlarge_z = (Lims_lattice[2][1] - np.max(Pos_lattice[:,2])) + (np.min(Pos_lattice[:,2] - Lims_lattice[2][0]))
         # Transformation of the cuboid into the helix
         Pos_transfo,Lims_tot = _geometric_transformation(Pos, Types, Lims_lattice, D=D_transfo,rota=rota,periodic=periodic,params_helix=[pitch,width,thickness],enlarge_z=enlarge_z)
+
+        if hand == "left":
+            Pos_transfo[:,0] *= -1
+            Lims_tot[0] = [-Lims_tot[0][1], -Lims_tot[0][0]]
 
         # Mapping of the indices between cast and surface
         Pos_transfo_int = Pos_transfo[mask_int]
